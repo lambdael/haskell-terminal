@@ -2,9 +2,13 @@ module Hsterm.State where
 import Data.IORef
 import Graphics.Rendering.OpenGL hiding (Bool, Float)
 import Graphics.Rendering.OpenGL.GLU (perspective)
-import Graphics.Rendering.GLU.Raw
+
+
+import Graphics.GLU
+-- import Graphics.Rendering.GLU.Raw
 import Graphics.Rendering.OpenGL.GL.FramebufferObjects
-import Graphics.Rendering.OpenGL.Raw.ARB.Compatibility (glPushMatrix, glPopMatrix)
+-- #import Graphics.GL.
+-- #import Graphics.Rendering.OpenGL.Raw.ARB.Compatibility (glPushMatrix, glPopMatrix)
 import Graphics.UI.GLUT hiding (Bool, Float, Font, fontHeight, fontWidth)
 import Graphics.Rendering.FTGL (Font)
 
@@ -14,6 +18,9 @@ import qualified Data.Time.Clock as C
 import Terminal.Terminal
 import Terminal.Types
 import Hsterm.Config
+import qualified System.Console.Terminfo as TI
+
+import System.IO
 
 data State = State {
     terminal :: IORef Terminal,
@@ -25,12 +32,16 @@ data State = State {
     currentFont :: IORef (Maybe Font),
     fontWidth :: IORef Float,
     fontHeight :: IORef Float,
+    inp :: IORef Handle,
+    out :: IORef Handle,
+    err :: IORef Handle,
     config :: IORef TerminalConfig
 }
 
-makeState :: TerminalConfig -> IO State
-makeState cfg = do
-    terminal' <- newIORef defaultTerm
+makeState :: TerminalConfig -> Handle -> Handle -> Handle -> IO State
+makeState cfg inp'' out'' err'' = do
+    terminfo' <- TI.setupTermFromEnv
+    terminal' <- newIORef $ defaultTerm terminfo'
 
     startupTime' <- getCurrentTime >>= newIORef
     lastKeystrokeTime' <- getCurrentTime >>= newIORef
@@ -42,6 +53,10 @@ makeState cfg = do
     fontWidth' <- newIORef 0.0
     fontHeight' <- newIORef 0.0
     config' <- newIORef cfg
+    
+    inp' <- newIORef inp''
+    out' <- newIORef out''
+    err' <- newIORef err''
 
     return State {
         terminal = terminal',
@@ -55,5 +70,8 @@ makeState cfg = do
         currentFont = currentFont',
         fontHeight = fontHeight',
         fontWidth = fontWidth',
-        config = config'
+        config = config',
+        inp = inp',
+        out = out',
+        err = err'
     }

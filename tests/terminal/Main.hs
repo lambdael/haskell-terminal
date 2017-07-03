@@ -15,10 +15,10 @@ import Terminal.Terminal
 import Terminal.Types
 
 handleActions [] t = t
-handleActions (a : as) t = handleActions as (applyAction a t)
+handleActions (a : as) t = handleActions as (applyAction t a)
 
--- |Apply a list of `TerminalAction`s to the default terminal
-applyDef actions = handleActions actions defaultTerm
+-- |Apply a list of `TerminalAction`s to the default termi
+aplyDef actions = handleActions actions defaultTerm
 
 -- |Test if currentForeground, currentBackground can be set
 testColors :: Assertion
@@ -147,7 +147,7 @@ instance Arbitrary TerminalAction where
 
 -- |Make sure that the cursor always is within bounds
 prop_SafeCursor a =
-    let t = (handleActions a defaultTerm)
+    let t = (handleActions defaultTerm a)
         (y, x) = cursorPos t in
     x >= 1 && y >= 1 && x <= cols t && y <= rows t
 

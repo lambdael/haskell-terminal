@@ -1,2 +1,2 @@
 stty echo
-bash data/colors.sh
+sh data/colors.sh

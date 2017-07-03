@@ -1,19 +1,19 @@
 module Terminal.Parser (parseANSI, parseANSIAnnotate) where
-import Control.Monad
-import Control.Applicative hiding (many, (<|>))
-import Control.Monad.State
-import System.IO
-import System.Exit
-import Data.Char
-import Text.Parsec
-import Text.Parsec.String
-import Debug.Trace
-import Data.List (insert)
-import Data.Maybe (maybeToList)
-import qualified Text.Parsec.Token as PT
+import           Control.Applicative  hiding (many, (<|>))
+import           Control.Monad
+import           Control.Monad.State
+import           Data.Char
+import           Data.List            (insert)
+import           Data.Maybe           (maybeToList)
+import           Debug.Trace
+import           System.Exit
+import           System.IO
+import           Text.Parsec
+import           Text.Parsec.String
+import qualified Text.Parsec.Token    as PT
 
-import Terminal.Types
-import Terminal.ParserUtils
+import           Terminal.ParserUtils
+import           Terminal.Types
 
 -- TODO: choose another name
 simplify :: TerminalAction -> TerminalAction
@@ -34,12 +34,14 @@ simplify (ANSIAction [] 'f') = SetCursor 1 1
 simplify (ANSIAction [y,x] 'H') = SetCursor y x
 simplify (ANSIAction [y,x] 'f') = SetCursor y x
 
+
 simplify (ANSIAction [start, end] 'r') = SetScrollingRegion start end
 simplify (ANSIAction [] 'S') = ScrollUp 1
 simplify (ANSIAction [n] 'S') = ScrollUp n
 simplify (ANSIAction [] 'T') = ScrollDown 1
 simplify (ANSIAction [n] 'T') = ScrollDown n
 
+simplify (ANSIAction [] 'm') = SetAttributeMode [ResetAllAttributes] 
 simplify (ANSIAction attrModeNumbers 'm') = SetAttributeMode (map toEnum attrModeNumbers)
 simplify x = x
 

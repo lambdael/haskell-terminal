@@ -23,6 +23,6 @@ playScript s = do
     where (Right (annotatedActions, _)) = parseANSIAnnotate s
           applyAction' term (a, t) = do
                 renderAnnotatedAction (a, t)
-                return (applyAction a term)
+                return (applyAction  term a)
 
 main = getArgs >>= readFile . head >>= playScript

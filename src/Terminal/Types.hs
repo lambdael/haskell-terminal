@@ -3,6 +3,7 @@ import Data.Array.Diff
 import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Tuple (swap)
+import qualified System.Console.Terminfo as TI
 
 type ScreenIndex = (Int, Int)
 
@@ -12,7 +13,8 @@ data TerminalChar = TerminalChar {
     backgroundColor :: TerminalColor,
     isBright :: Bool,
     isUnderlined :: Bool,
-    isBlinking :: Bool
+    isBlinking :: Bool,
+    isInverse :: Bool
 } deriving (Show)
 
 type TerminalArray = DiffArray ScreenIndex
@@ -23,6 +25,7 @@ data Terminal = Terminal {
     cursorPos :: ScreenIndex,
     screen :: TerminalScreen,
     inBuffer :: String,
+    allBuffer :: [TerminalAction],
     responseBuffer :: String,
     terminalTitle :: String,
     scrollingRegion :: (Int, Int),
@@ -31,15 +34,17 @@ data Terminal = Terminal {
 
     currentForeground :: TerminalColor,
     currentBackground :: TerminalColor,
-
+    terminfo :: TI.Terminal,
     optionShowCursor :: Bool,
     optionBright :: Bool,
     optionUnderlined :: Bool,
+    optionInverse :: Bool,
     optionBlinking :: Bool
 }
 
 data TerminalAction =
        CharInput Char
+
 
      -- Cursor movements
      | CursorUp Int
@@ -49,6 +54,8 @@ data TerminalAction =
      | SetCursor Int Int
      | CursorAbsoluteColumn Int
      | CursorAbsoluteRow Int
+
+
 
      -- Scrolling
      | SetScrollingRegion Int Int

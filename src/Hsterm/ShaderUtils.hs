@@ -2,13 +2,17 @@
 -- Largely taken from GLUT's Brick.hs example
 module Hsterm.ShaderUtils where
 
+
+
 import Prelude hiding ( sum )
 import Control.Applicative
 import Control.Monad
+import Data.Maybe
 import Control.Exception
 import Data.Foldable ( Foldable, sum )
 import Data.IORef
 import Graphics.UI.GLUT
+import Graphics.Rendering.OpenGL.GL.Shaders.ShaderObjects
 
 -- Make sure that GLSL is supported by the driver, either directly by the core
 -- or via an extension.
@@ -20,10 +24,10 @@ checkGLSLSupport = do
       unless ("GL_ARB_shading_language_100" `elem` extensions) $
          ioError (userError "No GLSL support found.")
 
-readAndCompileShader :: Shader s => FilePath -> IO s
-readAndCompileShader filePath = do
+readAndCompileShader ::  FilePath -> ShaderType -> IO Shader
+readAndCompileShader filePath st = do
    src <- readFile filePath
-   [shader] <- genObjectNames 1
+   shader <- createShader st
    shaderSource shader $= [src]
    compileShader shader
    reportErrors
@@ -35,23 +39,29 @@ readAndCompileShader filePath = do
       ioError (userError "shader compilation failed")
    return shader
 
-linkShaders :: [VertexShader] -> [FragmentShader] -> IO (Program)
+linkShaders :: [Shader] -> [Shader] -> IO (Maybe Program)
 linkShaders vs fs = do
-   [prog] <- genObjectNames 1
-   attachedShaders prog $= (vs, fs)
-   linkProgram prog
-   reportErrors
-   ok <- get (linkStatus prog)
-   unless ok $ do
-      infoLog <- get (programInfoLog prog)
-      putStrLn infoLog
-      deleteObjectNames [prog]
-      ioError (userError "linking failed")
-   return prog
+   -- [prog] <- genObjectNames 1
+   mprog <- get currentProgram
+   if isJust mprog then do
+     let prog = fromJust mprog
+     attachedShaders prog $= vs
+     attachedShaders prog $= fs
+     linkProgram prog
+     reportErrors
+     ok <- get (linkStatus prog)
+     unless ok $ do
+       infoLog <- get (programInfoLog prog)
+       putStrLn infoLog
+       deleteObjectNames [prog]
+       ioError (userError "linking failed")
+       return ()
+     else return ()
+   return mprog
 
-readCompileAndLink :: String -> String -> IO (Program)
+readCompileAndLink :: String -> String -> IO (Maybe Program)
 readCompileAndLink vspath fspath = do
-  vs <- readAndCompileShader vspath
-  fs <- readAndCompileShader fspath
+  vs <- readAndCompileShader  vspath VertexShader
+  fs <- readAndCompileShader fspath FragmentShader
   linkShaders [vs] [fs]
 
