@@ -1,3 +1,35 @@
+{-# LANGUAGE Rank2Types #-}
+-- Captures how TerminalActions change the Terminal
+module Terminal.Terminal (newTerminal, defaultTerm, applyAction, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
+import System.Process
+import Data.Array.Diff
+import Data.Char
+import Control.Monad
+import Control.Monad.State hiding (state)
+import System.IO
+import System.Posix.IO
+import System.Posix.Terminal hiding (TerminalState)
+import GHC.IO.Handle
+import Debug.Trace
+import Control.Concurrent
+import Control.Applicative hiding (many)
+
+import Terminal.Parser
+import Terminal.Types
+
+defaultForegroundColor = White
+defaultBackgroundColor = Black
+
+mkChar c term = TerminalChar {
+                    character = c,
+                    foregroundColor = currentForeground term,
+                    backgroundColor = currentBackground term,
+                    isBright = optionBright term,
+                    isBlinking = optionBlinking term,
+                    isUnderlined = optionUnderlined term,
+                    isInverse = optionInverse term
+                }
+mkEmptyChar = mkChar ' '
 testTerm = defaultTerm
 defaultTerm = newTerminal (24, 80)
 
