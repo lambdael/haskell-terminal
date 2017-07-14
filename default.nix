@@ -2,8 +2,8 @@
 , GLURaw, GLUT, HUnit, mtl, OpenGL, OpenGLRaw, parsec, process
 , QuickCheck, random, stdenv, stm, test-framework
 , test-framework-hunit, test-framework-quickcheck2, time, unix
-, terminfo
-, bash , readline
+, terminfo , concurrent-extra, unbounded-delays, ioctl
+, bash , readline, mesa_noglu, freeglut
 }:
 mkDerivation {
   pname = "Terminal";
@@ -13,12 +13,13 @@ mkDerivation {
   isExecutable = true;
   executableHaskellDepends = [
     array base colour containers diffarray FTGL GLURaw GLUT mtl OpenGL
-    OpenGLRaw parsec process random stm time unix terminfo
+    OpenGLRaw parsec process random stm time unix terminfo concurrent-extra unbounded-delays
+    ioctl
   ];
   testHaskellDepends = [
     base diffarray HUnit QuickCheck test-framework test-framework-hunit
     test-framework-quickcheck2
   ];
-  executableSystemDepends = [ bash readline ];
+  executableSystemDepends = [ bash readline mesa_noglu freeglut ];
   license = "GPL";
 }

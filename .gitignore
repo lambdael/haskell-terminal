@@ -1,4 +1,6 @@
 *.sw?
 dist
 hsterm
+result
+TAGS
 *~

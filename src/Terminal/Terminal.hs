@@ -41,7 +41,7 @@ setSize  s@(r, c) term  = let
   del = if diff <0 then 0 else diff
   allBuff = allBuffer term
   -- newBuff = delLastTill (\c-> (character c) `eq` CharInput (mkEmptyChar term)) $ allBuff
-  newterm = (newTerminal s $ terminfo term) {allBuffer = allBuff}
+  newterm = (newTerminal s $ terminfo term)
   buff = drop ((length allBuff)- (2*r*c)::Int) $ allBuff 
   in foldl  applyAction newterm buff
 
@@ -125,15 +125,26 @@ scrollTerminalDown term@Terminal { screen = s, scrollingRegion = r@(startrow, en
 
 clearRows :: [Int] -> Terminal -> Terminal
 clearRows rows term@Terminal { screen = s, rows = r, cols = c} =
-    term {
-        screen = s // [((y_,x_), mkEmptyChar term)|x_<-[1..c],y_<-rows]
-    }
+    write term [((y_,x_), mkEmptyChar term)|x_<-[1..c],y_<-rows] 
+
 
 clearColumns :: Int -> [Int] -> Terminal -> Terminal
 clearColumns row cols term@Terminal { screen = s } =
-    term { 
-        screen = s // [((row,x_), mkEmptyChar term)|x_<-cols]
+    write term [((row,x_), mkEmptyChar term)|x_<-cols] 
+
+
+write :: Terminal -> [((Int,Int), TerminalChar)] -> Terminal
+write term@Terminal {screen=s, rows=r, cols=c} l = 
+    term {
+      screen = s // [(pos, ch)| (pos, ch)<-l , isin_ pos (r,c)]
     }
+isin_ (y, x) (r, c) = isin y x r c
+isin y x r c = (0 < x) && (x <= c) && (0 < y) && (y <= r)
+
+
+
+
+
 
 -- Attribute mode handling
 applyAttributeMode :: Terminal -> AttributeMode -> Terminal
@@ -162,15 +173,21 @@ applyAttributeMode term NotInverse = term { optionInverse = False }
 
 applyAttributeMode term other = trace ("\nUnimplemented attribute mode: " ++ show other) term
 
+
 applyAction :: Terminal -> TerminalAction -> Terminal
-applyAction term'@Terminal { screen = s, cursorPos = pos@(y, x), inBuffer = inb  } act =
-    safeCursor t
+applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act =
+    -- safeCursor t
+    t
     -- where t = case (trace ("Action" ++ show act) act) of
     where
+      pos@ (y, x) = pos_
       term = term' {allBuffer = (allBuffer term') ++ [act]}
       add s c = s ++ [ mkChar c term]
       r = rows term
       c = cols term
+      write' l term = write term l
+      curpos p term =safeCursor $ term {cursorPos = p}
+
       t = case act of
             Ignored             -> term
 
@@ -178,26 +195,14 @@ applyAction term'@Terminal { screen = s, cursorPos = pos@(y, x), inBuffer = inb 
             CharInput c@'\a'      -> term 
 
             -- Tab
-            CharInput c@ '\t'      -> term { cursorPos = (y, (x `div` 8 + 1) * 8)
-                                          -- , inBuffer = add inb c
-                                          }
+            CharInput c@ '\t'      -> curpos (y, (x `div` 8 + 1) * 8) term
 
             -- Newline
-            CharInput ch@ '\n'      -> (term) { cursorPos = (y + 1, 1)
-                                          -- , inBuffer = add inb c
-                                          }
-            CharInput c@ '\r'      -> term { cursorPos = (y, 1)
-                                          -- , inBuffer = add inb c
-                                          }
-            CharInput c@ '\b'      -> term { screen = s // [(pos, mkEmptyChar term)]
-                                          , cursorPos = (y, x - 1)
-                                          -- , inBuffer = add inb c
-                                          }
-            CharInput c         -> term { 
-                                    screen = s // [(pos, mkChar c term)]
-                                    , cursorPos = (y, x + 1)
-                                    -- , inBuffer = add inb c
-                                       }
+            CharInput ch@ '\n'      -> curpos  (y + 1, 1) term
+            CharInput c@ '\r'      -> curpos (y, 1) term
+            CharInput c@ '\b'      -> curpos (y, x - 1) $ write' [(pos, mkEmptyChar term)] term
+            CharInput c         -> curpos (y, x + 1) $ write' [(pos, mkChar c term)] term 
+
             -- Cursor movements
             CursorUp n          -> (iterate up term) !! n
             CursorDown n        -> (iterate down term) !! n
@@ -236,7 +241,7 @@ applyAction term'@Terminal { screen = s, cursorPos = pos@(y, x), inBuffer = inb 
             -- Erases from the current cursor position to the end of the current line. 
             ANSIAction _ 'K'    -> clearColumns y [x..c] term
 
-            -- ANSIAction [n] 'X'    -> clearColumns y [x..(n+x)] term
+            ANSIAction [n] 'X'    -> clearColumns y [x..(n+x)] term
             -- Set Mode. 
             ANSIAction _ 'h'    -> clearColumns y [x..c] term
 

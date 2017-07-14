@@ -9,13 +9,13 @@ Build-Type: Simple
 Cabal-Version: >=1.2
 Extra-source-files: README.md
 -- Data-Files: data/fonts/*.ttf data/*.sh
-data-dir:  data
+data-dirs:  data, themes
 Executable hsterm
   Main-is: Main.hs
   Hs-Source-Dirs: src/Hsterm, src
   Extensions: CPP
-  Build-Depends: array, base >= 3 && < 5, containers, mtl, random, stm, terminfo >= 0.4.0.2
-  Build-Depends: time, GLUT, OpenGLRaw, GLURaw, OpenGL, parsec, unix, process
-  Build-Depends: FTGL >= 1.333, colour, diffarray
+  Build-Depends: array, base >= 3 && < 5, bytestring >= 0.10.8.1, containers, mtl, random, stm, terminfo >= 0.4.0.2, text >= 1.2.2.1, text >= 1.2.2.1
+  Build-Depends: time, GLUT, OpenGLRaw, GLURaw, OpenGL, parsec, unix, process, ioctl
+  Build-Depends: FTGL >= 1.333, colour, diffarray, concurrent-extra, unbounded-delays
   GHC-Options: -O
 
