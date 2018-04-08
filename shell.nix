@@ -5,11 +5,13 @@ let
   systemPackages = with pkgs; [
       weechat
       emacs
+      bash
+      make
       haskellPackages.apply-refact
       haskellPackages.hlint
       haskellPackages.stylish-haskell
       haskellPackages.hasktags
-      # haskellPackages.hoogle
+      haskellPackages.hoogle
       readline
        ];
   # Install Fonts.
