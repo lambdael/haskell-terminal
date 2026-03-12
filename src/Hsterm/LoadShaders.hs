@@ -40,7 +40,7 @@ data ShaderSource =
 
 getSource :: ShaderSource -> IO B.ByteString
 getSource (ByteStringSource bs) = return bs
-getSource (StringSource str) = return $ packUtf8 str
+getSource (StringSource str) = return $ TE.encodeUtf8 $ T.pack str
 getSource (FileSource path) = B.readFile path
 
 -- packUtf8 :: String -> B.ByteString

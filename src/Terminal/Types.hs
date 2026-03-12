@@ -34,7 +34,7 @@ data Terminal = Terminal {
 
     currentForeground :: TerminalColor,
     currentBackground :: TerminalColor,
-    terminfo :: TI.Terminal,
+    terminfo :: Maybe TI.Terminal,
     optionShowCursor :: Bool,
     optionBright :: Bool,
     optionUnderlined :: Bool,

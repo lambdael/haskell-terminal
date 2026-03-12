@@ -7,7 +7,6 @@ import Data.IORef
 import Data.List
 import Data.Char
 import Data.Maybe (fromJust, isJust, fromMaybe)
-import Data.Ord ((<=),(>=)) 
 -- import Control.Monad
 import Control.Monad.State hiding (state, get, State)
 import System.IO
@@ -20,7 +19,7 @@ import Foreign.C.Types
 import Data.Time.Clock
 import Data.Time.Calendar
 import Data.Colour.SRGB (RGB(..), toSRGB)
-import Data.Colour (Colour(..))
+import Data.Colour (Colour)
 
 import Graphics.UI.GLUT hiding (Bool, Float, fontWidth, fontHeight, RGB, renderer, cursor)
 import Graphics.Rendering.OpenGL hiding (Bool, Float, get, RGB, renderer)
@@ -47,7 +46,6 @@ import qualified GHC.IO.Device as Dev
 
 import System.Posix.Types (CPid, Fd)
 import System.Posix.Signals
-import System.Posix.Terminal
 import Hsterm.State
 -- import Hsterm.ShaderUtils
 import Hsterm.Config
@@ -306,14 +304,14 @@ keyboardMouseHandler state (Char c) Down modifiers position = do
   term <- get $ terminal state
   hIn  <- get $ inp state
   
-  let ti = terminfo term
+  let ti = fromJust $ terminfo term
   TI.hRunTermOutput hIn ti $ TI.termText [c] 
     -- hPutChar hInWrite c
   hFlush hIn
 keyboardMouseHandler state (SpecialKey c) Down modifiers position = do
   term <- get $ terminal state
   hIn  <- get $ inp state
-  let ti = terminfo term
+  let ti = fromJust $ terminfo term
   let cmd = lookup c terminalKeys
   -- let termOut = (TI.getCapability ti cmd)
   if isJust cmd then

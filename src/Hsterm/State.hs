@@ -5,8 +5,6 @@ import Graphics.Rendering.OpenGL hiding (Bool, Float, renderer)
 import Graphics.Rendering.OpenGL.GLU (perspective)
 import qualified GHC.IO.Handle.FD as FD
 import System.IO
-import Graphics.GLU
--- import Graphics.Rendering.GLU.Raw
 import Graphics.Rendering.OpenGL.GL.FramebufferObjects
 -- #import Graphics.GL.
 -- #import Graphics.Rendering.OpenGL.Raw.ARB.Compatibility (glPushMatrix, glPopMatrix)
@@ -54,7 +52,7 @@ makeState :: Conf.TerminalConfig -> Handle -> Handle -> Handle -> CPid -> Fd -> 
 makeState cfg inp'' out'' err'' pid' pterm = do
     let terminators' = []
     terminfo' <- TI.setupTermFromEnv
-    terminal' <- newIORef $ defaultTerm terminfo'
+    terminal' <- newIORef $ newTerminal (24, 80) (Just terminfo')
 
     startupTime' <- getCurrentTime >>= newIORef
     lastKeystrokeTime' <- getCurrentTime >>= newIORef

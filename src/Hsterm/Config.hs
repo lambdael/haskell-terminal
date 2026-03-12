@@ -1,6 +1,6 @@
 module Hsterm.Config where
 import Data.Colour.SRGB (sRGB)
-import Data.Colour (Colour)
+import Data.Colour
 import Terminal.Types (TerminalColor(..))
 import Hsterm.Renderer
 import Hsterm.Renderer.DefaultRenderer
@@ -9,7 +9,6 @@ import qualified Hsterm.Renderer.CursorRenderer as CR
 import qualified Hsterm.Renderer.Background as BR
 import Graphics.Rendering.OpenGL.GL.Shaders.ProgramObjects 
 import Graphics.Rendering.OpenGL (Color4, GLfloat)
-import Data.Colour 
 -- These get overwritten with nicer colors in Main.hs
 defaultColor Black   = sRGB 0 0 0
 defaultColor Green   = sRGB 0 1 0

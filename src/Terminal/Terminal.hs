@@ -31,7 +31,7 @@ mkChar c term = TerminalChar {
                 }
 mkEmptyChar = mkChar ' '
 testTerm = defaultTerm
-defaultTerm = newTerminal (24, 80)
+defaultTerm = newTerminal (24, 80) Nothing
 
 setSize :: (Int, Int) -> Terminal -> Terminal
 setSize  s@(r, c) term  = let
@@ -55,7 +55,7 @@ delLastTill p (x:xs) = if p x
   --         total = y * oldc + x
                             --         in (total `quot` c, total `rem` c)
           
-newTerminal s@(rows, cols) term = Terminal {
+newTerminal s@(rows, cols) mterm = Terminal {
     cursorPos = (1, 1),
     rows = rows,
     cols = cols,
@@ -69,12 +69,12 @@ newTerminal s@(rows, cols) term = Terminal {
     currentBackground = defaultBackgroundColor,
     optionShowCursor = True,
     terminalTitle = "",
-    terminfo = term,
+    terminfo = mterm,
     optionBright = False,
     optionUnderlined = False,
     optionBlinking = False,
     optionInverse = False
-} where e = mkEmptyChar (newTerminal s term) -- Hail laziness
+} where e = mkEmptyChar (newTerminal s mterm) -- Hail laziness
 
 up t@Terminal {cursorPos = (y, x)} = safeCursor $ t { cursorPos = (y - 1, x) }
 down t@Terminal {cursorPos = (y, x)} = safeCursor $ t { cursorPos = (y + 1, x) }

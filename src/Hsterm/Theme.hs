@@ -1,7 +1,8 @@
 module Hsterm.Theme (colorize) where
 import Terminal.Types
 import Data.Maybe (fromJust)
-import Data.Colour.SRGB (Colour, sRGB24read)
+import Data.Colour (Colour)
+import Data.Colour.SRGB (sRGB24read)
 
 colorMap = [ (Black, "#000000")
     , (Red, "#ff6565")
@@ -12,7 +13,7 @@ colorMap = [ (Black, "#000000")
     , (Cyan, "#89b6e2")
     , (White, "#cccccc") ]
 
-colorize :: TerminalColor -> Bool -> Colour
+colorize :: TerminalColor -> Bool -> Colour Double
 colorize termcol bold = sRGB24read . fromJust . lookup termcol cmap
         where cmap = if bold then colorMap else colorMap
 

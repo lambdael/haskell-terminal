@@ -7,7 +7,7 @@ import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Test.HUnit
-import Test.QuickCheck hiding ((==>),)
+import Test.QuickCheck hiding ((==>))
 
 import Terminal.Parser
 import Terminal.Terminal
