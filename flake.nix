@@ -13,6 +13,7 @@
 
         haskellPackages = pkgs.haskellPackages.override {
           overrides = hself: hsuper: {
+            ioctl = pkgs.haskell.lib.markUnbroken (pkgs.haskell.lib.doJailbreak hsuper.ioctl);
             Terminal = hself.callCabal2nix "Terminal" (pkgs.lib.cleanSource ./.) {};
           };
         };
