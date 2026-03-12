@@ -208,9 +208,9 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             CursorDown n        -> (iterate down term) !! n
             CursorForward n     -> (iterate right term) !! n
             CursorBackward n    -> (iterate left term) !! n
-            CursorAbsoluteColumn col -> term { cursorPos = (y, col) }
-            CursorAbsoluteRow row  -> term { cursorPos = (row, x) }
-            SetCursor row col   -> term { cursorPos = (row, col) }
+            CursorAbsoluteColumn col -> safeCursor $ term { cursorPos = (y, col) }
+            CursorAbsoluteRow row  -> safeCursor $ term { cursorPos = (row, x) }
+            SetCursor row col   -> safeCursor $ term { cursorPos = (row, col) }
 
             -- Cursor visibility
             ShowCursor s        -> term { optionShowCursor = s }
