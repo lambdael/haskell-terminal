@@ -1,5 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | Provides functionality of rendering the application model.
+-- | カーソルレンダラー。
+--
+-- 指定した 'AlphaColour' でカーソル位置にブロックを描画する。
+-- GLSL シェーダー (@themes\/default\/cursor.vert@ + @simple.frag@) を使用。
 module Hsterm.Renderer.CursorRenderer
     ( cursorRenderer
     ) where

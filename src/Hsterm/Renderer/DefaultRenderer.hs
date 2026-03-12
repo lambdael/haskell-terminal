@@ -1,5 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | Provides functionality of rendering the application model.
+-- | デフォルトレンダラー。
+--
+-- シェーダーで着色された矩形を描画する基本レンダラー。
+-- 他のレンダラー（Background, CursorRenderer, FlatColor）の基盤となる。
 module Hsterm.Renderer.DefaultRenderer
     ( defaultRenderer,
       render,

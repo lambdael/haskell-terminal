@@ -1,4 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
+-- | POSIX @struct winsize@ の Haskell 表現。
+--
+-- ターミナルのウィンドウサイズを取得・設定する ioctl 呼び出しで使用する。
+-- 'Foreign.Storable.Storable' インスタンスを提供し、FFI マーシャリングに対応。
 module Terminal.Posix.Winsize 
 where
 

@@ -1,5 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses, ForeignFunctionInterface, FunctionalDependencies #-}
--- | Vendored from the ioctl package (broken with GHC >= 9.4)
+-- | POSIX ioctl(2) の型安全な Haskell ラッパー。
+--
+-- 壊れた @ioctl@ Hackage パッケージ（GHC >= 9.4 でビルド不可）の
+-- 代替としてプロジェクト内に vendor したもの。
+-- 'IOControl' 型クラスでリクエストコードとデータ型を結び付ける。
 module System.Posix.IOCtl
   ( IOControl(..)
   , ioctl

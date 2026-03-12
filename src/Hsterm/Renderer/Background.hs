@@ -1,5 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | Provides functionality of rendering the application model.
+-- | グラディエント背景レンダラー。
+--
+-- ウィンドウ全体にグラディエント付きの矩形を描画する。
+-- GLSL シェーダー (@themes\/default\/colored.vert@ + @simple.frag@) を使用。
 module Hsterm.Renderer.Background
     ( background
     ) where

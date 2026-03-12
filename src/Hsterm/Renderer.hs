@@ -1,5 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | Provides functionality of rendering the application model.
+-- | レンダラーインターフェース。
+--
+-- 背景やカーソルの描画をプラグイン可能にするための
+-- 抽象型を定義する。各レンダラーは @IO (Render, Terminate)@
+-- の形式で、初期化時に描画コールバックとクリーンアップコールバックを返す。
 module Hsterm.Renderer
 where
 

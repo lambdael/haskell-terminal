@@ -1,3 +1,8 @@
+-- | ターミナルアプリケーションの設定。
+--
+-- カラーマップ、フォント、レンダラーなどの
+-- カスタマイズ可能な設定を保持する 'TerminalConfig' と
+-- そのデフォルト値を提供する。
 module Hsterm.Config where
 import Data.Colour.SRGB (sRGB)
 import Data.Colour

@@ -1,5 +1,9 @@
 {-# LANGUAGE Rank2Types #-}
--- Captures how TerminalActions change the Terminal
+-- | ターミナル状態マシン。
+--
+-- 'TerminalAction' を 'Terminal' に適用して状態を遷移させる純粋関数を提供する。
+-- カーソル移動、スクロール、文字書き込み、属性変更、画面消去、
+-- リサイズなどのターミナル操作を実装する。
 module Terminal.Terminal (newTerminal, defaultTerm, applyAction, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
 import System.Process
 import Data.Array.Diff
@@ -17,9 +21,12 @@ import Control.Applicative hiding (many)
 import Terminal.Parser
 import Terminal.Types
 
+-- | デフォルトの前景色。
 defaultForegroundColor = White
+-- | デフォルトの背景色。
 defaultBackgroundColor = Black
 
+-- | 指定した文字と現在のターミナル属性から 'TerminalChar' を作成する。
 mkChar c term = TerminalChar {
                     character = c,
                     foregroundColor = currentForeground term,
@@ -29,10 +36,19 @@ mkChar c term = TerminalChar {
                     isUnderlined = optionUnderlined term,
                     isInverse = optionInverse term
                 }
+-- | 空白文字の 'TerminalChar' を作成する。
 mkEmptyChar = mkChar ' '
+
+-- | テスト用のターミナル。'defaultTerm' と同じ。
 testTerm = defaultTerm
+
+-- | 24行×80列のデフォルトターミナル（terminfo なし）。
 defaultTerm = newTerminal (24, 80) Nothing
 
+-- | ターミナルを新しいサイズに変更する。
+--
+-- 内部的に新しいターミナルを作成し、過去のアクションバッファを
+-- リプレイすることで画面内容を再構築する。
 setSize :: (Int, Int) -> Terminal -> Terminal
 setSize  s@(r, c) term  = let
   or = rows term
@@ -55,6 +71,10 @@ delLastTill p (x:xs) = if p x
   --         total = y * oldc + x
                             --         in (total `quot` c, total `rem` c)
           
+-- | 指定したサイズの新しいターミナルを作成する。
+--
+-- @newTerminal (rows, cols) mterm@ で、@rows@ 行 @cols@ 列の空白ターミナルを生成する。
+-- GUI 使用時は @mterm = Just terminfo@ 。テストやリプレイ時は @Nothing@ 。
 newTerminal s@(rows, cols) mterm = Terminal {
     cursorPos = (1, 1),
     rows = rows,

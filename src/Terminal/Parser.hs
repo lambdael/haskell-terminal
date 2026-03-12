@@ -1,3 +1,9 @@
+-- | VT100/ANSI エスケープシーケンスパーサー。
+--
+-- 生のバイトストリームを Parsec で解析し、
+-- 'TerminalAction' のリストに変換する。
+-- CSI シーケンス、OSC タイトル設定、制御文字、
+-- 通常文字を認識する。
 module Terminal.Parser (parseANSI, parseANSIAnnotate) where
 import           Control.Applicative  hiding (many, (<|>))
 import           Control.Monad
@@ -15,7 +21,10 @@ import qualified Text.Parsec.Token    as PT
 import           Terminal.ParserUtils
 import           Terminal.Types
 
--- TODO: choose another name
+-- | 生の CSI シーケンスを意味のある 'TerminalAction' に変換する。
+--
+-- 例: @ANSIAction [1] 'A'@ → @CursorUp 1@
+-- 例: @ANSIAction [31,40] 'm'@ → @SetAttributeMode [Foreground Red, Background Black]@
 simplify :: TerminalAction -> TerminalAction
 simplify (ANSIAction [] 'A') = CursorUp 1
 simplify (ANSIAction [n] 'A') = CursorUp n
@@ -50,11 +59,18 @@ parseString str = fst (fromRight (parseANSI str))
                 where fromRight :: Either a b -> b
                       fromRight (Right r) = r
 
+-- | ANSI エスケープシーケンスをパースする。
+--
+-- 成功すると、パース済みの 'TerminalAction' リストと
+-- 未消費の残り文字列を返す。インクリメンタルパースに対応。
+--
+-- >>> parseANSI "Hello\ESC[31mWorld"
+-- Right ([CharInput 'H',...,SetAttributeMode [Foreground Red],...],"")
 parseANSI :: String -> Either ParseError ([TerminalAction], String)
 parseANSI s = parse (manyWithLeftover pSingle) "" s
 
--- |Parse incoming text, and return each TerminalAction annotated with the
--- parsed string. This is usefull for debugging.
+-- | 'parseANSI' のデバッグ版。
+-- 各アクションに、それを生成した元のバイト列を付与して返す。
 parseANSIAnnotate :: String -> Either ParseError ([(TerminalAction, String)], String)
 parseANSIAnnotate s = parse (manyWithLeftover $ annotate pSingle) "" s
 

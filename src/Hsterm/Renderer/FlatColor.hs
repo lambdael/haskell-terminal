@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | Provides functionality of rendering the application model.
+-- | 単色フラットレンダラー。
+--
+-- 指定した 'AlphaColour' で均一に塗り潰した矩形を描画する。
 module Hsterm.Renderer.FlatColor
     ( flatColor
     ) where

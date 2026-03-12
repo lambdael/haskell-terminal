@@ -1,4 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
+-- | ターミナル状態のデバッグ表示。
+--
+-- ターミナルの画面内容を ASCII アート風にテキスト出力する。
 module Terminal.Debug (printTerminal) where
 import Data.Array.Diff ( elems, (//) )
 import System.IO

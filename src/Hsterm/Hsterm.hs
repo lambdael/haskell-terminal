@@ -1,4 +1,9 @@
 {-# LANGUAGE Rank2Types #-}
+-- | ターミナルエミュレータのメインロジック。
+--
+-- OpenGL\/GLUT ウィンドウの初期化、PTY 子プロセスの生成、
+-- ANSI パースエンジンの接続、FTGL フォントレンダリング、
+-- キー入力ハンドリング、ウィンドウリサイズ対応を行う。
 module Hsterm.Hsterm where
 import System.Process hiding (createPipe)
 import System.Process.Internals (ProcessHandle__(..), withProcessHandle)

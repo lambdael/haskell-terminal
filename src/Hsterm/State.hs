@@ -1,3 +1,7 @@
+-- | アプリケーション状態。
+--
+-- GLUT コールバック間で共有される可変状態（'IORef' ベース）を
+-- 保持する 'State' データ型とその構築関数。
 module Hsterm.State where
 import Data.IORef
 import Data.Maybe
