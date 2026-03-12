@@ -14,7 +14,7 @@ colorMap = [ (Black, "#000000")
     , (White, "#cccccc") ]
 
 colorize :: TerminalColor -> Bool -> Colour Double
-colorize termcol bold = sRGB24read . fromJust . lookup termcol cmap
+colorize termcol bold = sRGB24read $ fromJust $ lookup termcol cmap
         where cmap = if bold then colorMap else colorMap
 
 

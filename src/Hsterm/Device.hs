@@ -47,7 +47,7 @@ instance IODevice Hasterm where
 
   -- | for terminal devices, changes whether characters are echoed on
   -- the device.
-  setEcho dev b = return $ dev{echo = b}
+  setEcho dev b = return ()
 
   -- | returns the current echoing status.
   getEcho dev = return $ echo dev

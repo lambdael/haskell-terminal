@@ -345,7 +345,7 @@ runHsterm :: TerminalConfig -> IO ()
 runHsterm cfg = do
     
     initDisplay cfg 
-    ss@ (Size w h) <- get windowSize
+    ss@(Size w h) <- get windowSize
     -- Size c r = winSizeToRowCol ss 
     -- environment variables
     let environment = [
