@@ -192,15 +192,15 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             Ignored             -> term
 
             -- Bell
-            CharInput c@'\a'      -> term 
+            CharInput '\a'      -> term 
 
             -- Tab
-            CharInput c@ '\t'      -> curpos (y, (x `div` 8 + 1) * 8) term
+            CharInput '\t'      -> curpos (y, (x `div` 8 + 1) * 8) term
 
             -- Newline
-            CharInput ch@ '\n'      -> curpos  (y + 1, 1) term
-            CharInput c@ '\r'      -> curpos (y, 1) term
-            CharInput c@ '\b'      -> curpos (y, x - 1) $ write' [(pos, mkEmptyChar term)] term
+            CharInput '\n'      -> curpos  (y + 1, 1) term
+            CharInput '\r'      -> curpos (y, 1) term
+            CharInput '\b'      -> curpos (y, x - 1) $ write' [(pos, mkEmptyChar term)] term
             CharInput c         -> curpos (y, x + 1) $ write' [(pos, mkChar c term)] term 
 
             -- Cursor movements

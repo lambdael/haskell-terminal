@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, ForeignFunctionInterface, AllowAmbiguousTypes #-}
+{-# LANGUAGE MultiParamTypeClasses, ForeignFunctionInterface, FunctionalDependencies #-}
 -- | Vendored from the ioctl package (broken with GHC >= 9.4)
 module System.Posix.IOCtl
   ( IOControl(..)
@@ -13,7 +13,7 @@ import Foreign.C.Types
 import Foreign.C.Error (throwErrnoIfMinus1_)
 import System.Posix.Types (Fd(..))
 
-class (Storable d) => IOControl req d where
+class (Storable d) => IOControl req d | req -> d where
   ioctlReq :: req -> CULong
 
 foreign import ccall "sys/ioctl.h ioctl" c_ioctl :: CInt -> CULong -> Ptr a -> IO CInt
