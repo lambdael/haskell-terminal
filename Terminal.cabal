@@ -15,6 +15,7 @@ extra-source-files:
 library
   hs-source-dirs:   src
   exposed-modules:
+    System.Posix.IOCtl
     Terminal.Debug
     Terminal.Parser
     Terminal.ParserUtils
@@ -28,7 +29,6 @@ library
     base          >= 4 && < 5,
     containers,
     diffarray,
-    ioctl,
     mtl,
     parsec,
     process,
@@ -65,7 +65,6 @@ executable hsterm
     FTGL,
     GLUT,
     GLURaw,
-    ioctl,
     mtl,
     OpenGL,
     OpenGLRaw,
