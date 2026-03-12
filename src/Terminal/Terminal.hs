@@ -180,7 +180,7 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
     t
     -- where t = case (trace ("Action" ++ show act) act) of
     where
-      pos@ (y, x) = pos_
+      pos@(y, x) = pos_
       term = term' {allBuffer = (allBuffer term') ++ [act]}
       add s c = s ++ [ mkChar c term]
       r = rows term

@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, ForeignFunctionInterface #-}
+{-# LANGUAGE MultiParamTypeClasses, ForeignFunctionInterface, AllowAmbiguousTypes #-}
 -- | Vendored from the ioctl package (broken with GHC >= 9.4)
 module System.Posix.IOCtl
   ( IOControl(..)
