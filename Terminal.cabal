@@ -80,6 +80,35 @@ executable hsterm
   default-language: Haskell2010
   ghc-options:      -O
 
+executable hsterm-gpipe
+  main-is:          Hsterm/GPipe/EntryPoint.hs
+  hs-source-dirs:   src
+  other-modules:
+    Hsterm.GPipe.Main
+    Hsterm.GPipe.Renderer
+    Hsterm.GPipe.Terminal
+  build-depends:
+    Terminal,
+    array,
+    base            >= 4.16 && < 5,
+    bytestring,
+    colour,
+    containers,
+    diffarray,
+    GPipe           >= 2.2,
+    GPipe-GLFW      >= 1.4,
+    gpipe-freetype,
+    linear,
+    mtl,
+    parsec,
+    process,
+    stm,
+    terminfo,
+    time,
+    unix
+  default-language: GHC2021
+  ghc-options:      -O
+
 executable hstermplay
   main-is:          Main.hs
   hs-source-dirs:   src/Hstermplay

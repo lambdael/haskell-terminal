@@ -3,7 +3,7 @@
 --
 -- ターミナルの画面内容を ASCII アート風にテキスト出力する。
 module Terminal.Debug (printTerminal) where
-import Data.Array.Diff ( elems, (//) )
+import Data.Array ( elems, (//) )
 import System.IO
 -- import Data.Set (elems)
 import Terminal.Types

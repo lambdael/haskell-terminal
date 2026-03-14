@@ -18,6 +18,45 @@
         "type": "github"
       }
     },
+    "gpipe-core-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773443682,
+        "narHash": "sha256-vJeQV0e2oRij7cX0H8PKKdvWmO3Y8/PKe2w8pHdrd2Y=",
+        "path": "/mnt/share/GPipe-Core",
+        "type": "path"
+      },
+      "original": {
+        "path": "/mnt/share/GPipe-Core",
+        "type": "path"
+      }
+    },
+    "gpipe-freetype-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773443670,
+        "narHash": "sha256-aSpLSpkpn3C7n8z/wJH6CauBMrkFijiS7AxXJLEysoQ=",
+        "path": "/mnt/share/gpipe-freetype",
+        "type": "path"
+      },
+      "original": {
+        "path": "/mnt/share/gpipe-freetype",
+        "type": "path"
+      }
+    },
+    "gpipe-glfw-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773374592,
+        "narHash": "sha256-+ng5WndtkVERK7vIzHB8P64wlkIFfmk72wmlC0enj6g=",
+        "path": "/mnt/share/GPipe-GLFW",
+        "type": "path"
+      },
+      "original": {
+        "path": "/mnt/share/GPipe-GLFW",
+        "type": "path"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1751274312,
@@ -37,6 +76,9 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "gpipe-core-src": "gpipe-core-src",
+        "gpipe-freetype-src": "gpipe-freetype-src",
+        "gpipe-glfw-src": "gpipe-glfw-src",
         "nixpkgs": "nixpkgs"
       }
     },

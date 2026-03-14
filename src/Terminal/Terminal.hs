@@ -6,7 +6,7 @@
 -- リサイズなどのターミナル操作を実装する。
 module Terminal.Terminal (newTerminal, defaultTerm, applyAction, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
 import System.Process
-import Data.Array.Diff
+import Data.Array
 import Data.Char
 import Control.Monad
 import Control.Monad.State hiding (state)
@@ -47,24 +47,33 @@ defaultTerm = newTerminal (24, 80) Nothing
 
 -- | ターミナルを新しいサイズに変更する。
 --
--- 内部的に新しいターミナルを作成し、過去のアクションバッファを
--- リプレイすることで画面内容を再構築する。
+-- 旧画面から新画面へセルを直接コピーする。
+-- 重なる範囲だけコピーし、新しい部分は空白で埋める。
 setSize :: (Int, Int) -> Terminal -> Terminal
-setSize  s@(r, c) term  = let
-  or = rows term
+setSize s@(r, c) term = let
+  newterm = (newTerminal s $ terminfo term) {
+    currentForeground = currentForeground term,
+    currentBackground = currentBackground term,
+    optionBright = optionBright term,
+    optionUnderlined = optionUnderlined term,
+    optionBlinking = optionBlinking term,
+    optionInverse = optionInverse term,
+    terminalTitle = terminalTitle term
+  }
+  or_ = rows term
   oc = cols term
-  diff = r*c - or*oc
-  del = if diff <0 then 0 else diff
-  allBuff = allBuffer term
-  -- newBuff = delLastTill (\c-> (character c) `eq` CharInput (mkEmptyChar term)) $ allBuff
-  newterm = (newTerminal s $ terminfo term)
-  buff = drop ((length allBuff)- (2*r*c)::Int) $ allBuff 
-  in foldl  applyAction newterm buff
-
-delLastTill :: (a -> Bool) -> [a] -> [a]
-delLastTill p (x:xs) = if p x
-                       then delLastTill p xs
-                       else xs
+  -- 旧画面の重なる範囲をコピー
+  overlap = [ ((y, x), screen term ! (y, x))
+            | y <- [1..min r or_]
+            , x <- [1..min c oc]
+            ]
+  -- カーソルは新しい範囲内にクランプ
+  (cy, cx) = cursorPos term
+  newCursor = (min r (max 1 cy), min c (max 1 cx))
+  in newterm {
+    screen = screen newterm // overlap,
+    cursorPos = newCursor
+  }
   -- ixmap ((1::Int,1::Int) , (r, c)) f s
   -- where f (y, x) = let
   --         (_ , (oldr, oldc) ) = bounds s
@@ -80,7 +89,6 @@ newTerminal s@(rows, cols) mterm = Terminal {
     rows = rows,
     cols = cols,
     inBuffer = "",
-    allBuffer = [],
     responseBuffer = "",
     scrollingRegion = (1, rows),
     screen = array ((1, 1), s)
@@ -201,7 +209,7 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
     -- where t = case (trace ("Action" ++ show act) act) of
     where
       pos@(y, x) = pos_
-      term = term' {allBuffer = (allBuffer term') ++ [act]}
+      term = term'
       add s c = s ++ [ mkChar c term]
       r = rows term
       c = cols term
@@ -274,6 +282,10 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             -- Attribute mode / color handling
             SetAttributeMode ms -> foldl applyAttributeMode term ms
             -- SetAttributeMode [] -> applyAttributeMode term $ ResetAllAttributes
+
+            -- Keypad mode switches (no-op for rendering; affects key encoding)
+            KeypadKeysApplicationsMode -> term
+            KeypadKeysNumericMode      -> term
 
             _                   -> trace ("\nTerminal.hs Unimplemented action: " ++ show act) term
 

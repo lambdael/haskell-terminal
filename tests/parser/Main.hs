@@ -13,6 +13,8 @@ import Terminal.Parser
 import Terminal.Terminal
 import Terminal.Types
 
+import Data.Word (Word8)
+
 -- |This section contains unit tests to validate the parser, that is to ensure
 -- that the incoming character stream is correctly translated into
 -- `TerminalAction`s. This fact is clearly expressed by the function signature
@@ -75,6 +77,27 @@ unitTests =
        , testCase "testResetColors"
             ("\ESC[39;49m" ==> [SetAttributeMode [ResetForeground, ResetBackground]])
        , testCase "testSetTerminalTitle" testSetTerminalTitle
+       -- 256色対応テスト
+       , testCase "test256ColorForeground"
+            ("\ESC[38;5;196m" ==> [SetAttributeMode [Foreground (Color256 196)]])
+       , testCase "test256ColorBackground"
+            ("\ESC[48;5;82m" ==> [SetAttributeMode [Background (Color256 82)]])
+       , testCase "test256ColorBoth"
+            ("\ESC[38;5;196;48;5;232m" ==> [SetAttributeMode [Foreground (Color256 196), Background (Color256 232)]])
+       -- TrueColor対応テスト
+       , testCase "testTrueColorForeground"
+            ("\ESC[38;2;255;128;0m" ==> [SetAttributeMode [Foreground (ColorRGB 255 128 0)]])
+       , testCase "testTrueColorBackground"
+            ("\ESC[48;2;0;64;128m" ==> [SetAttributeMode [Background (ColorRGB 0 64 128)]])
+       , testCase "testTrueColorWithAttrs"
+            ("\ESC[1;38;2;255;0;0;4m" ==> [SetAttributeMode [Bright, Foreground (ColorRGB 255 0 0), Underlined]])
+       -- 明るい色 (SGR 90-97 / 100-107) テスト
+       , testCase "testBrightForeground"
+            ("\ESC[91m" ==> [SetAttributeMode [Foreground (Color256 9)]])
+       , testCase "testBrightBackground"
+            ("\ESC[100m" ==> [SetAttributeMode [Background (Color256 8)]])
+       , testCase "testBrightFgBg"
+            ("\ESC[97;104m" ==> [SetAttributeMode [Foreground (Color256 15), Background (Color256 12)]])
        ]
 
 -- |The second section of this file consists of QuickCheck properties to ensure

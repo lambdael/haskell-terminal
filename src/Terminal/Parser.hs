@@ -11,6 +11,7 @@ import           Control.Monad.State
 import           Data.Char
 import           Data.List            (insert)
 import           Data.Maybe           (maybeToList)
+import           Data.Word            (Word8)
 import           Debug.Trace
 import           System.Exit
 import           System.IO
@@ -51,8 +52,33 @@ simplify (ANSIAction [] 'T') = ScrollDown 1
 simplify (ANSIAction [n] 'T') = ScrollDown n
 
 simplify (ANSIAction [] 'm') = SetAttributeMode [ResetAllAttributes] 
-simplify (ANSIAction attrModeNumbers 'm') = SetAttributeMode (map toEnum attrModeNumbers)
+simplify (ANSIAction attrModeNumbers 'm') = SetAttributeMode (parseAttributeModes attrModeNumbers)
 simplify x = x
+
+-- | SGR パラメータリストを 'AttributeMode' に変換する。
+--
+-- 256色 (38;5;N / 48;5;N) および TrueColor (38;2;R;G;B / 48;2;R;G;B) の
+-- サブパラメータ構造を認識する。
+parseAttributeModes :: [Int] -> [AttributeMode]
+parseAttributeModes [] = []
+-- 256色: 前景 (38;5;N)
+parseAttributeModes (38:5:n:rest) = Foreground (Color256 (clamp256 n)) : parseAttributeModes rest
+-- TrueColor: 前景 (38;2;R;G;B)
+parseAttributeModes (38:2:r:g:b:rest) = Foreground (ColorRGB (clampW r) (clampW g) (clampW b)) : parseAttributeModes rest
+-- 256色: 背景 (48;5;N)
+parseAttributeModes (48:5:n:rest) = Background (Color256 (clamp256 n)) : parseAttributeModes rest
+-- TrueColor: 背景 (48;2;R;G;B)
+parseAttributeModes (48:2:r:g:b:rest) = Background (ColorRGB (clampW r) (clampW g) (clampW b)) : parseAttributeModes rest
+-- その他: 単一パラメータを toEnum で変換
+parseAttributeModes (n:rest) = toEnum n : parseAttributeModes rest
+
+-- | 値を 0–255 にクランプ。
+clamp256 :: Int -> Int
+clamp256 = max 0 . min 255
+
+-- | Int を Word8 にクランプ変換。
+clampW :: Int -> Word8
+clampW = fromIntegral . max 0 . min 255
 
 parseString :: String -> [TerminalAction]
 parseString str = fst (fromRight (parseANSI str))
@@ -93,7 +119,7 @@ pStandardANSISeq = do
     string "\ESC["
     optionMaybe (char '?')
     param <- optionMaybe pNumber
-    params <- manyUpTo 0 2 (char ';' >> pNumber)
+    params <- many (try (char ';' >> pNumber))
     c <- letter
     return $ ANSIAction (maybeToList param ++ params) c
 

@@ -7,7 +7,7 @@
 module Hsterm.Hsterm where
 import System.Process hiding (createPipe)
 import System.Process.Internals (ProcessHandle__(..), withProcessHandle)
-import Data.Array.Diff
+import Data.Array
 import Data.IORef
 import Data.List
 import Data.Char
@@ -40,6 +40,7 @@ import System.Posix.IOCtl
 import Control.Concurrent
 import Control.Applicative hiding (many)
 import System.Environment
+import System.Exit (exitSuccess)
 
 import qualified System.Console.Terminfo  as TI
 import qualified System.Console.Terminfo.Keys  as TI
@@ -287,31 +288,53 @@ displayHandler state = do
     _ -> return ()
 
   swapBuffers
-  -- delay (1000 * 30) 
-runTerminal :: IORef Terminal -> Handle -> Handle -> IO ()
-runTerminal a in_ out =
+
+-- | PTY 出力を読み取ってターミナル状態を更新するスレッド。
+-- dirty フラグを立てて、次の表示更新時にだけ再描画させる。
+runTerminal :: IORef Terminal -> IORef Bool -> Handle -> Handle -> IO ()
+runTerminal a dirty in_ out =
     forever $ do
-        c <- (liftIO $ hGetChar out)
+        -- まず1文字読む（ブロッキング）
+        c <- hGetChar out
+        -- 続けて読めるだけ読む（ノンブロッキング）
+        rest <- drainAvailable out
         s <- readIORef a
 
         -- Parse the input buffer for characters or ANSI sequences
-        Right (actions, leftover) <- return $ parseANSI $ inBuffer s ++ [c]
+        Right (actions, leftover) <- return $ parseANSI $ inBuffer s ++ (c : rest)
 
-        -- Apply all the actions to the terminal state
-        forM_ actions $ \x -> modifyIORef a $ flip applyAction x
+        -- Apply all the actions to the terminal state (strict)
+        forM_ actions $ \x -> modifyIORef' a $ flip applyAction x
 
-        -- Store the actions that could not be parsed as input buffer
-        modifyIORef a $ \term -> term { inBuffer = leftover }
+        -- Store the actions that could not be parsed as input buffer (strict)
+        modifyIORef' a $ \term -> term { inBuffer = leftover }
 
-        -- delay (1000 * 1)
+        -- 画面内容が変わったので dirty フラグを立てる
+        writeIORef dirty True
+
+-- | Handle から読めるだけノンブロッキングで読み取る
+drainAvailable :: Handle -> IO String
+drainAvailable h = do
+    ready <- hReady h `catch` \(SomeException _) -> return False
+    if ready
+      then do
+        c <- hGetChar h
+        rest <- drainAvailable h
+        return (c : rest)
+      else return []
 
 keyboardMouseHandler state (Char c) Down modifiers position = do
-  term <- get $ terminal state
+  -- Ctrl+Q で強制終了
+  when (c == '\DC1') $ do  -- '\DC1' = Ctrl+Q (ASCII 17)
+    signalProcess sigINT (pid state)
+    exitSuccess
+  hPutStrLn stderr $ "Key: " ++ show (ord c) ++ " (" ++ show c ++ ")"
   hIn  <- get $ inp state
-  
-  let ti = fromJust $ terminfo term
-  TI.hRunTermOutput hIn ti $ TI.termText [c] 
-    -- hPutChar hInWrite c
+  -- Ctrl 修飾子が押されていて、通常文字の場合は制御コードに変換
+  let c' = if (ctrl modifiers == Down) && ord c >= ord 'a' && ord c <= ord 'z'
+           then chr (ord c - ord 'a' + 1)
+           else c
+  hPutChar hIn c'
   hFlush hIn
 keyboardMouseHandler state (SpecialKey c) Down modifiers position = do
   term <- get $ terminal state
@@ -329,7 +352,14 @@ keyboardMouseHandler state chr st modifiers position = return ()
 terminalKeys =
   [ (KeyUp, TI.keyUp)
   , (KeyDown, TI.keyDown)
-
+  , (KeyLeft, TI.keyLeft)
+  , (KeyRight, TI.keyRight)
+  , (KeyHome, TI.keyHome)
+  , (KeyEnd, TI.keyEnd)
+  , (KeyPageUp, TI.keyPageUp)
+  , (KeyPageDown, TI.keyPageDown)
+  , (KeyInsert, TI.keyEnter)
+  , (KeyDelete, TI.keyDeleteChar)
   ]
 
 getScreenSizePix ::  State  -> IO Size
@@ -399,30 +429,47 @@ runHsterm cfg = do
     -- run gui
     do
       hFlush inp
+      dirty <- newIORef True
       state <- makeState cfg inp out err pid'' masterFd
-      forkIO $ runTerminal (terminal state) inp out
-      initUI cfg state  
+      forkIO $ runTerminal (terminal state) dirty inp out
+
+      -- SIGINT を受けたら子プロセスに転送する（親は終了しない）
+      -- SIGTERM を受けたらクリーンに終了
+      _ <- installHandler sigINT  (Catch (signalProcess sigINT pid'')) Nothing
+      _ <- installHandler sigTERM (Catch (signalProcess sigINT pid'' >> exitSuccess)) Nothing
+
+      initUI cfg state dirty
       signalProcess sigINT pid''
       `catch` \(SomeException e) -> do -- Have you ever seen ZOMBI?
         print e
         signalProcess sigINT pid''
 
 
-initUI cfg state = do 
+initUI cfg state dirty = do 
 
     ss <- getScreenSizePix state
  
     -- windowSize $= ss
 
     displayCallback $= displayHandler state
-    idleCallback $= Just (postRedisplay Nothing)
+
+    -- idleCallback ではなく timerCallback でフレームレートを制限する (約60fps)。
+    -- dirty フラグが立っている時だけ再描画を要求する。
+    let scheduleRedraw = addTimerCallback 16 $ do
+          d <- readIORef dirty
+          when d $ do
+            writeIORef dirty False
+            postRedisplay Nothing
+          scheduleRedraw
+    scheduleRedraw
+
     reshapeCallback $= Just (reshapeHandler state)
 
     keyboardMouseCallback $= Just (keyboardMouseHandler state)
-      
-    -- print $ "hOutRead" ++ show hOutRead
-    -- print $ "hOutWrite" ++ show hOutWrite
-    -- hPutChar inp 's'
+
+    -- ウィンドウが閉じられたときにプロセスを終了する (FreeGLUT)
+    actionOnWindowClose $= Exit
+
     mainLoop 
 
 mp (x:xs) = show x ++ "\n" ++ mp xs

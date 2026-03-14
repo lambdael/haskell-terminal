@@ -32,6 +32,7 @@ nix run
 ./result/bin/hsterm
 ```
 
+/home/akk/haskell-terminal/haskell-terminal.code-workspace
 Cabal のみで（依存関係が揃っている場合）：
 
 ```bash

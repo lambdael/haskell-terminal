@@ -3,10 +3,11 @@
 -- ターミナルの状態（画面バッファ、カーソル、色、属性）、
 -- パース済みアクション、ANSI SGR 属性モードを定義する。
 module Terminal.Types where
-import Data.Array.Diff
+import Data.Array
 import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Tuple (swap)
+import Data.Word (Word8)
 import qualified System.Console.Terminfo as TI
 
 -- | スクリーン上の座標。@(行, 列)@ で 1-indexed。
@@ -24,8 +25,8 @@ data TerminalChar = TerminalChar {
     isInverse :: Bool               -- ^ 反転属性
 } deriving (Show)
 
--- | 'ScreenIndex' でインデックスされる差分配列。
-type TerminalArray = DiffArray ScreenIndex
+-- | 'ScreenIndex' でインデックスされる配列。
+type TerminalArray = Array ScreenIndex
 
 -- | ターミナル画面全体を表す 'TerminalChar' の2次元配列。
 type TerminalScreen = TerminalArray TerminalChar
@@ -41,7 +42,6 @@ data Terminal = Terminal {
     cursorPos :: ScreenIndex,         -- ^ 現在のカーソル位置 @(行, 列)@
     screen :: TerminalScreen,         -- ^ 画面バッファ
     inBuffer :: String,               -- ^ パース途中の入力バッファ
-    allBuffer :: [TerminalAction],    -- ^ 適用された全アクションの履歴（リサイズ時のリプレイ用）
     responseBuffer :: String,         -- ^ ターミナルからの応答バッファ
     terminalTitle :: String,          -- ^ ウィンドウタイトル
     scrollingRegion :: (Int, Int),    -- ^ スクロール領域 @(開始行, 終了行)@
@@ -87,7 +87,10 @@ data TerminalAction =
      | Ignored                          -- ^ 無視するシーケンス
      deriving (Show, Eq)
 
--- | ANSI 基本8色。SGR コード 30-37（前景）/ 40-47（背景）に対応。
+-- | ターミナルの色。
+--
+-- 基本8色（SGR 30-37 / 40-47）、256色パレット（SGR 38;5;N / 48;5;N）、
+-- TrueColor（SGR 38;2;R;G;B / 48;2;R;G;B）に対応。
 data TerminalColor =
       Black
     | Red
@@ -97,6 +100,8 @@ data TerminalColor =
     | Magenta
     | Cyan
     | White
+    | Color256 !Int             -- ^ 256色パレット (0-255)
+    | ColorRGB !Word8 !Word8 !Word8  -- ^ TrueColor 24bit (R, G, B)
     deriving (Show, Eq)
 
 instance Enum TerminalColor where
@@ -151,5 +156,7 @@ tableAM = [ (ResetAllAttributes, 0)
           , (NotHidden, 28)
           ] ++ [(Foreground tcol, 30 + fromEnum tcol) | tcol <- [Black .. White]]
             ++ [(Background tcol, 40 + fromEnum tcol) | tcol <- [Black .. White]]
-            ++ [(ResetForeground, 39), (ResetBackground, 49)]
-
+            ++ [(ResetForeground, 39), (ResetBackground, 49)]            -- SGR 90-97: 明るい前景色（Color256 8-15 にマッピング）
+            ++ [(Foreground (Color256 (8 + fromEnum tcol)), 90 + fromEnum tcol) | tcol <- [Black .. White]]
+            -- SGR 100-107: 明るい背景色（Color256 8-15 にマッピング）
+            ++ [(Background (Color256 (8 + fromEnum tcol)), 100 + fromEnum tcol) | tcol <- [Black .. White]]
