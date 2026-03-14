@@ -286,17 +286,19 @@ buildTextGridVertices atlas r c =
 -- * glyphPos: 各セルのグリフ位置情報 (offsetX, offsetY, width, height)
 --
 -- @scrollOffset@ が正の場合、スクロールバック履歴を表示する。
+-- @selection@ が @Just ((r1,c1),(r2,c2))@ の場合、選択範囲の前景色・背景色を反転する。
 buildCellData
   :: FontAtlas
   -> Terminal
   -> (Bool -> TerminalColor -> V4 Float)
   -> Int    -- ^ scrollOffset (0 = 通常表示, >0 = 履歴をスクロール表示)
+  -> Maybe ((Int, Int), (Int, Int))  -- ^ selection range (normalized: start <= end)
   -> ( [V4 Float]   -- ^ bgColor per cell
      , [V4 Float]   -- ^ fgColor per cell
      , [V4 Float]   -- ^ glyphUV (u0,v0,u1,v1) per cell
      , [V4 Float]   -- ^ glyphPos (ox,oy,w,h) per cell
      )
-buildCellData atlas term colorFn scrollOffset =
+buildCellData atlas term colorFn scrollOffset selection =
   unzip4 $ map cellData (indices (screen term))
   where
     asc = fromIntegral (faAscender atlas) :: Float
@@ -330,9 +332,18 @@ buildCellData atlas term colorFn scrollOffset =
           fgc = if isInverse tc then backgroundColor tc else foregroundColor tc
           bgCol = colorFn False bgc
           fgCol = colorFn (isBright tc) fgc
+          -- 選択範囲内なら前景色と背景色を反転する
+          selected = case selection of
+            Nothing -> False
+            Just ((r1, c1), (r2, c2))
+              | r1 == r2  -> y == r1 && x >= c1 && x <= c2
+              | otherwise -> (y == r1 && x >= c1)
+                          || (y > r1 && y < r2)
+                          || (y == r2 && x <= c2)
+          (bgCol', fgCol') = if selected then (fgCol, bgCol) else (bgCol, fgCol)
           ch = character tc
           (glyphUV, glyphPos) = glyphInfo ch
-      in (bgCol, fgCol, glyphUV, glyphPos)
+      in (bgCol', fgCol', glyphUV, glyphPos)
 
     glyphInfo ' ' = (V4 0 0 0 0, V4 0 0 0 0)
     glyphInfo ch  = case Map.lookup ch (faGlyphs atlas) of

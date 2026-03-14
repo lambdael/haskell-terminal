@@ -10,8 +10,10 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (SomeException(..), try, catch)
 import Control.Monad (unless, when, void)
 import Control.Monad.IO.Class (liftIO)
+import Data.Array ((!))
 import Data.Char (chr, ord)
 import Data.IORef
+import Data.List (dropWhileEnd)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Word (Word8)
 import System.Exit (exitSuccess)
@@ -46,6 +48,54 @@ import Terminal.Posix.Winsize (Winsize(..))
 
 import Hsterm.GPipe.Terminal
 import Hsterm.GPipe.Renderer
+
+-- ── 選択状態 ──────────────────────────────────────────────
+
+-- | マウスによるテキスト選択の状態。
+-- セル座標は 1-indexed の @(行, 列)@。
+data Selection = Selection
+  { selAnchor :: !(Int, Int)  -- ^ ドラッグ開始位置
+  , selCurrent :: !(Int, Int) -- ^ 現在のドラッグ位置
+  } deriving (Show, Eq)
+
+-- | 選択範囲を正規化して @(開始, 終了)@ を返す（開始 <= 終了）。
+selectionRange :: Selection -> ((Int, Int), (Int, Int))
+selectionRange (Selection a b)
+  | a <= b    = (a, b)
+  | otherwise = (b, a)
+
+-- | ターミナル状態から選択範囲のテキストを抽出する。
+-- スクロールバック表示中はスクロールオフセットを考慮する。
+extractSelectedText :: Terminal -> Int -> Selection -> String
+extractSelectedText term scrollOffset sel =
+  let ((r1, c1), (r2, c2)) = selectionRange sel
+      r = rows term
+      c = cols term
+      sbuf = scrollbackBuffer term
+      sbLen = Seq.length sbuf
+      lookupChar (y, x) =
+        if scrollOffset <= 0
+          then character (screen term ! (y, x))
+          else let vIdx = sbLen - scrollOffset + (y - 1)
+               in if vIdx < 0 then ' '
+                  else if vIdx < sbLen
+                       then let line = Seq.index sbuf vIdx
+                            in if x >= 1 && x <= length line
+                               then character (line !! (x - 1))
+                               else ' '
+                       else let screenRow = vIdx - sbLen + 1
+                            in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c
+                               then character (screen term ! (screenRow, x))
+                               else ' '
+      trimEnd = dropWhileEnd (== ' ')
+  in if r1 == r2
+     -- 1行選択
+     then trimEnd [lookupChar (r1, cx) | cx <- [c1..c2]]
+     -- 複数行選択
+     else let firstLine = trimEnd [lookupChar (r1, cx) | cx <- [c1..c]]
+              midLines  = [trimEnd [lookupChar (ry, cx) | cx <- [1..c]] | ry <- [r1+1..r2-1]]
+              lastLine  = trimEnd [lookupChar (r2, cx) | cx <- [1..c2]]
+          in unlines (firstLine : midLines) ++ lastLine
 
 -- ── 設定 ──────────────────────────────────────────────────
 
@@ -188,6 +238,12 @@ runGPipeTerminal = do
   dirty   <- newIORef True
   scrollOffsetRef <- newIORef (0 :: Int)
 
+  -- 選択状態
+  selectionRef <- newIORef (Nothing :: Maybe Selection)
+  -- クリップボード操作要求（IOコールバック → ContextT ループ間通信）
+  clipboardWriteRef <- newIORef (Nothing :: Maybe String)
+  pasteRequestRef   <- newIORef False
+
   -- PTY 読み取りスレッド
   _ <- forkIO $ runTerminalReader termRef dirty (ptyMaster pty)
 
@@ -228,6 +284,20 @@ runGPipeTerminal = do
       when (keyState == KeyState'Pressed || keyState == KeyState'Repeating) $ do
         let shift = modifierKeysShift mods
             isScrollKey = shift && key `elem` [Key'PageUp, Key'PageDown, Key'Home, Key'End]
+            isClipboardKey = ctrl && shift && key `elem` [Key'C, Key'V]
+        -- Ctrl+Shift+C: 選択テキストをクリップボードにコピー
+        when (ctrl && shift && key == Key'C) $ do
+          sel <- readIORef selectionRef
+          case sel of
+            Just s -> do
+              term <- readIORef termRef
+              scrollOff <- readIORef scrollOffsetRef
+              let txt = extractSelectedText term scrollOff s
+              unless (null txt) $ writeIORef clipboardWriteRef (Just txt)
+            Nothing -> return ()
+        -- Ctrl+Shift+V: クリップボードからペースト
+        when (ctrl && shift && key == Key'V) $ do
+          writeIORef pasteRequestRef True
         -- スクロールバック操作（Shift+PageUp/Down/Home/End）
         when (shift && key == Key'PageUp) $ do
           term <- readIORef termRef
@@ -248,8 +318,8 @@ runGPipeTerminal = do
           writeIORef scrollOffsetRef 0
           writeIORef dirty True
         -- 通常キー入力時はスクロール位置をリセット
-        when (not isScrollKey) $ writeIORef scrollOffsetRef 0
-        when (not isScrollKey) $ case key of
+        when (not isScrollKey && not isClipboardKey) $ writeIORef scrollOffsetRef 0
+        when (not isScrollKey && not isClipboardKey) $ case key of
           -- Ctrl+Q で強制終了
           Key'Q | ctrl -> do
             signalProcess sigINT (ptyPid pty)
@@ -292,37 +362,58 @@ runGPipeTerminal = do
     -- マウスカーソル位置コールバック
     _ <- GLFW.setCursorPosCallback win $ Just $ \px py -> do
       writeIORef mousePosRef (px, py)
-      -- MouseAll / MouseButton モード時、移動中もイベント送信
       term <- readIORef termRef
       let mode = mouseMode term
       isDragging <- readIORef mouseBtnRef
-      when (mode == MouseAll || (mode == MouseButton && isDragging)) $ do
-        let col = floor (px / realToFrac cellW) + 1 :: Int
-            row = floor (py / realToFrac cellH) + 1 :: Int
-        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
-          let enc = mouseEncoding term
-              -- ボタンコード: ドラッグ中は +32、移動のみ(all mode)は button 3 (no button) + 32
-              cb = if isDragging then 32 else 35 + 32
-          sendPty $ encodeMouseEvent enc cb col row True
+      if mode /= MouseNone
+        then
+          -- MouseAll / MouseButton モード時、移動中もイベント送信
+          when (mode == MouseAll || (mode == MouseButton && isDragging)) $ do
+            let col = floor (px / realToFrac cellW) + 1 :: Int
+                row = floor (py / realToFrac cellH) + 1 :: Int
+            when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+              let enc = mouseEncoding term
+                  cb = if isDragging then 32 else 35 + 32
+              sendPty $ encodeMouseEvent enc cb col row True
+        else
+          -- マウスモード無効時: ドラッグ中なら選択範囲を更新
+          when isDragging $ do
+            let col = max 1 (min (cols term) (floor (px / realToFrac cellW) + 1 :: Int))
+                row = max 1 (min (rows term) (floor (py / realToFrac cellH) + 1 :: Int))
+            modifyIORef' selectionRef $ fmap $ \s -> s { selCurrent = (row, col) }
+            writeIORef dirty True
 
     -- マウスボタンコールバック
     _ <- GLFW.setMouseButtonCallback win $ Just $ \button state _mods -> do
       term <- readIORef termRef
       let mode = mouseMode term
-      when (mode /= MouseNone) $ do
-        (px, py) <- readIORef mousePosRef
-        let col = floor (px / realToFrac cellW) + 1 :: Int
-            row = floor (py / realToFrac cellH) + 1 :: Int
-        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
-          let enc = mouseEncoding term
-              btn = case button of
-                      MouseButton'1 -> 0  -- left
-                      MouseButton'2 -> 1  -- middle
-                      MouseButton'3 -> 2  -- right
-                      _             -> 0
-              isPress = state == MouseButtonState'Pressed
-          writeIORef mouseBtnRef isPress
-          sendPty $ encodeMouseEvent enc btn col row isPress
+          isPress = state == MouseButtonState'Pressed
+      if mode /= MouseNone
+        then do
+          (px, py) <- readIORef mousePosRef
+          let col = floor (px / realToFrac cellW) + 1 :: Int
+              row = floor (py / realToFrac cellH) + 1 :: Int
+          when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+            let enc = mouseEncoding term
+                btn = case button of
+                        MouseButton'1 -> 0  -- left
+                        MouseButton'2 -> 1  -- middle
+                        MouseButton'3 -> 2  -- right
+                        _             -> 0
+            writeIORef mouseBtnRef isPress
+            sendPty $ encodeMouseEvent enc btn col row isPress
+        else
+          -- マウスモード無効時: 左ボタンでテキスト選択
+          when (button == MouseButton'1) $ do
+            (px, py) <- readIORef mousePosRef
+            let col = max 1 (min (cols term) (floor (px / realToFrac cellW) + 1 :: Int))
+                row = max 1 (min (rows term) (floor (py / realToFrac cellH) + 1 :: Int))
+            writeIORef mouseBtnRef isPress
+            if isPress
+              then do
+                writeIORef selectionRef (Just (Selection (row, col) (row, col)))
+                writeIORef dirty True
+              else return ()
 
     -- スクロールコールバック
     _ <- GLFW.setScrollCallback win $ Just $ \_ dy -> do
@@ -362,7 +453,7 @@ runGPipeTerminal = do
         signalProcess 28 (ptyPid pty)  -- SIGWINCH
 
     -- メインループ
-    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef (ptyPid pty)
+    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty (ptyPid pty)
 
 -- | メインループ。
 --
@@ -386,10 +477,14 @@ mainLoop
   -> IORef Terminal
   -> IORef Bool
   -> IORef (V2 Int)
-  -> IORef Int        -- ^ scrollOffsetRef
+  -> IORef Int             -- ^ scrollOffsetRef
+  -> IORef (Maybe Selection) -- ^ selectionRef
+  -> IORef (Maybe String)  -- ^ clipboardWriteRef
+  -> IORef Bool            -- ^ pasteRequestRef
+  -> (String -> IO ())     -- ^ sendPty
   -> CPid
   -> ContextT GLFW.Handle os IO ()
-mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef pid = do
+mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty pid = do
   -- ウィンドウサイズを取得
   winSize <- liftIO $ readIORef winSizeRef
 
@@ -446,6 +541,23 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef pid = do
       -- フレームレート制限 ≒ 60fps
       liftIO $ threadDelay 16000
 
+      -- クリップボード操作（ContextT 内で実行する必要があるため、ここで処理）
+      -- コピー: clipboardWriteRef に text があればクリップボードに書き込む
+      mCopyText <- liftIO $ readIORef clipboardWriteRef
+      case mCopyText of
+        Just txt -> do
+          _ <- GLFW.setClipboardString win txt
+          liftIO $ writeIORef clipboardWriteRef Nothing
+        Nothing -> return ()
+      -- ペースト: pasteRequestRef が True ならクリップボードから読み取って PTY に送信
+      wantPaste <- liftIO $ readIORef pasteRequestRef
+      when wantPaste $ do
+        liftIO $ writeIORef pasteRequestRef False
+        mClip <- GLFW.getClipboardString win
+        case mClip of
+          Just (Just str) -> liftIO $ sendPty str
+          _ -> return ()
+
       curSize <- liftIO $ readIORef winSizeRef
 
       -- ウィンドウサイズが変わったらシェーダーを再コンパイル
@@ -500,8 +612,10 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef pid = do
 
       when (isDirty || resized) $ do
         scrollOff <- liftIO $ readIORef scrollOffsetRef
-        let (bgColors, fgColors, glyphUVs, glyphPositions) =
-              buildCellData atlas term colorFn scrollOff
+        sel <- liftIO $ readIORef selectionRef
+        let selRange = fmap selectionRange sel
+            (bgColors, fgColors, glyphUVs, glyphPositions) =
+              buildCellData atlas term colorFn scrollOff selRange
             texSize = V2 c r
 
         writeTexture2D bgTex  0 0 texSize bgColors
