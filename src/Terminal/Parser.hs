@@ -46,10 +46,12 @@ simplify (ANSIAction [y,x] 'f') = SetCursor y x
 
 
 simplify (ANSIAction [start, end] 'r') = SetScrollingRegion start end
-simplify (ANSIAction [] 'S') = ScrollUp 1
-simplify (ANSIAction [n] 'S') = ScrollUp n
-simplify (ANSIAction [] 'T') = ScrollDown 1
-simplify (ANSIAction [n] 'T') = ScrollDown n
+-- CSI S = SU (Scroll Up): content moves UP = scrollTerminalDown
+-- CSI T = SD (Scroll Down): content moves DOWN = scrollTerminalUp
+simplify (ANSIAction [] 'S') = ScrollDown 1
+simplify (ANSIAction [n] 'S') = ScrollDown n
+simplify (ANSIAction [] 'T') = ScrollUp 1
+simplify (ANSIAction [n] 'T') = ScrollUp n
 
 simplify (ANSIAction [] 'm') = SetAttributeMode [ResetAllAttributes] 
 simplify (ANSIAction attrModeNumbers 'm') = SetAttributeMode (parseAttributeModes attrModeNumbers)

@@ -33,8 +33,10 @@ testInvalidSetCursor = "\ESC[H\ESC[2;2;X\ESC[5;1H"
 testMoveCursor = "A\ESC[A\ESCA\ESC[10B"
         ==> [CharInput 'A', CursorUp 1, Ignored, CursorDown 10]
 
+-- CSI T = SD (content DOWN) = internal ScrollUp
+-- CSI S = SU (content UP)   = internal ScrollDown
 testScrolling = "\ESC[T\ESC[2S\ESC[4T\ESC[S"
-        ==> [ScrollDown 1, ScrollUp 2, ScrollDown 4, ScrollUp 1]
+        ==> [ScrollUp 1, ScrollDown 2, ScrollUp 4, ScrollDown 1]
 
 testCharInput = "A2$?"
         ==> [CharInput 'A', CharInput '2', CharInput '$', CharInput '?']

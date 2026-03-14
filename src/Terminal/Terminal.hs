@@ -225,8 +225,13 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             -- Tab
             CharInput '\t'      -> curpos (y, (x `div` 8 + 1) * 8) term
 
-            -- Newline
-            CharInput '\n'      -> curpos  (y + 1, 1) term
+            -- Newline (LF)
+            -- スクロール領域の底にいる場合は領域内スクロール
+            CharInput '\n'      ->
+              let (_, srBot) = scrollingRegion term
+              in if y == srBot
+                 then scrollTerminalDown $ term { cursorPos = (srBot, 1) }
+                 else curpos (y + 1, 1) term
             CharInput '\r'      -> curpos (y, 1) term
             CharInput '\b'      -> curpos (y, x - 1) $ write' [(pos, mkEmptyChar term)] term
             CharInput c         -> curpos (y, x + 1) $ write' [(pos, mkChar c term)] term 

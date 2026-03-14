@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ForeignFunctionInterface #-}
+{-# LANGUAGE ScopedTypeVariables, ForeignFunctionInterface, BangPatterns #-}
 -- | PTY 管理。
 --
 -- 擬似端末（PTY）を作成し、シェルプロセスを起動して
@@ -15,6 +15,7 @@ import Control.Concurrent (forkIO)
 import Control.Exception (SomeException(..), catch)
 import Control.Monad (forever, forM_)
 import Data.IORef
+import Data.List (foldl')
 import Data.Maybe (fromJust, fromMaybe)
 import Foreign.C.Types (CInt(..))
 import System.Environment (getEnvironment)
@@ -94,6 +95,8 @@ spawnShell = do
 
 -- | PTY 出力を読み取ってターミナル状態を更新するスレッド。
 -- dirty フラグを立てて、次の表示更新時にだけ再描画させる。
+-- 全アクションを一括適用してから writeIORef するので、
+-- 描画スレッドが中間状態を読むことはない。
 runTerminalReader :: IORef Terminal -> IORef Bool -> Handle -> IO ()
 runTerminalReader termRef dirty hOut =
   forever $ do
@@ -103,8 +106,8 @@ runTerminalReader termRef dirty hOut =
 
     Right (actions, leftover) <- return $ parseANSI $ inBuffer term ++ (c : rest)
 
-    forM_ actions $ \x -> modifyIORef' termRef $ flip applyAction x
-    modifyIORef' termRef $ \t -> t { inBuffer = leftover }
+    let !term' = foldl' applyAction term actions
+    writeIORef termRef $ term' { inBuffer = leftover }
 
     writeIORef dirty True
 

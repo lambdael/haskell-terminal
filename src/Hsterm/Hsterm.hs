@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, BangPatterns #-}
 -- | ターミナルエミュレータのメインロジック。
 --
 -- OpenGL\/GLUT ウィンドウの初期化、PTY 子プロセスの生成、
@@ -303,11 +303,11 @@ runTerminal a dirty in_ out =
         -- Parse the input buffer for characters or ANSI sequences
         Right (actions, leftover) <- return $ parseANSI $ inBuffer s ++ (c : rest)
 
-        -- Apply all the actions to the terminal state (strict)
-        forM_ actions $ \x -> modifyIORef' a $ flip applyAction x
-
-        -- Store the actions that could not be parsed as input buffer (strict)
-        modifyIORef' a $ \term -> term { inBuffer = leftover }
+        -- Apply all the actions to the terminal state atomically.
+        -- foldl' で一括適用し writeIORef 一回で書き込むことで、
+        -- 描画スレッドが中間状態を読むのを防ぐ。
+        let !s' = foldl' applyAction s actions
+        writeIORef a $ s' { inBuffer = leftover }
 
         -- 画面内容が変わったので dirty フラグを立てる
         writeIORef dirty True
