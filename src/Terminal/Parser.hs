@@ -37,8 +37,19 @@ simplify (ANSIAction [] 'D') = CursorBackward 1
 simplify (ANSIAction [n] 'D') = CursorBackward n
 simplify (ANSIAction [n] 'G') = CursorAbsoluteColumn n
 simplify (ANSIAction [n] 'd') = CursorAbsoluteRow n
-simplify (ANSIAction [25] 'h') = ShowCursor True
-simplify (ANSIAction [25] 'l') = ShowCursor False
+-- DEC Private Mode (CSI ? ... h/l)
+simplify (DECAction [25] 'h') = ShowCursor True
+simplify (DECAction [25] 'l') = ShowCursor False
+-- マウストラッキングモード
+simplify (DECAction [1000] 'h') = SetMouseMode MouseNormal
+simplify (DECAction [1002] 'h') = SetMouseMode MouseButton
+simplify (DECAction [1003] 'h') = SetMouseMode MouseAll
+simplify (DECAction [1000] 'l') = SetMouseMode MouseNone
+simplify (DECAction [1002] 'l') = SetMouseMode MouseNone
+simplify (DECAction [1003] 'l') = SetMouseMode MouseNone
+-- マウスエンコーディング
+simplify (DECAction [1006] 'h') = SetMouseEncoding MouseEncodingSGR
+simplify (DECAction [1006] 'l') = SetMouseEncoding MouseEncodingX10
 simplify (ANSIAction [] 'H') = SetCursor 1 1
 simplify (ANSIAction [] 'f') = SetCursor 1 1
 simplify (ANSIAction [y,x] 'H') = SetCursor y x
@@ -126,11 +137,14 @@ pANSISequence = try (pStandardANSISeq)
 
 pStandardANSISeq = do
     string "\ESC["
-    optionMaybe (char '?')
+    isPrivate <- optionMaybe (char '?')
     param <- optionMaybe pNumber
     params <- many (try (char ';' >> pNumber))
     c <- letter <|> char '@' <|> char '`'
-    return $ ANSIAction (maybeToList param ++ params) c
+    let ps = maybeToList param ++ params
+    return $ case isPrivate of
+      Just _  -> DECAction ps c
+      Nothing -> ANSIAction ps c
 
 pSetTerminalTitle = do
     string "\ESC]0;"

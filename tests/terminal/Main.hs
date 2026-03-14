@@ -380,9 +380,9 @@ testCursorAbsoluteRow = TestCase (do
 
 testCursorClampBounds = TestCase (do
     let term = feedStr "\ESC[999;999H"
-    -- safeCursor: x>cols → wrap to next row → y>rows → clamp to (rows, 1)
-    assertEqual "cursor clamped to bottom-left (wrap behavior)"
-        (24, 1) (cursorPos term)
+    -- safeCursor clamps to bottom-right corner (no wrap on cursor movement)
+    assertEqual "cursor clamped to bottom-right"
+        (24, 80) (cursorPos term)
     )
 -- ── htop メニューバーシナリオ ──────────────────────────
 

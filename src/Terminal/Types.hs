@@ -2,7 +2,9 @@
 --
 -- ターミナルの状態（画面バッファ、カーソル、色、属性）、
 -- パース済みアクション、ANSI SGR 属性モードを定義する。
-module Terminal.Types where
+module Terminal.Types (
+  module Terminal.Types,
+  ) where
 import Data.Array
 import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
@@ -54,7 +56,10 @@ data Terminal = Terminal {
     optionBright :: Bool,             -- ^ ブライト/ボールド属性
     optionUnderlined :: Bool,         -- ^ 下線属性
     optionInverse :: Bool,            -- ^ 反転属性
-    optionBlinking :: Bool            -- ^ 点滅属性
+    optionBlinking :: Bool,           -- ^ 点滅属性
+    mouseMode :: MouseMode,           -- ^ マウストラッキングモード
+    mouseEncoding :: MouseEncoding,   -- ^ マウスイベントのエンコーディング
+    pendingWrap :: Bool               -- ^ 行末で次の文字入力まで折り返しを保留するフラグ (DECAWM)
 }
 
 -- | パース済みのターミナルアクション。
@@ -79,6 +84,9 @@ data TerminalAction =
      | ScrollDown Int                   -- ^ n 行下スクロール (CSI T)
 
      | ANSIAction [Int] Char            -- ^ 未解釈の CSI シーケンス（パラメータ + 終端文字）
+     | DECAction [Int] Char             -- ^ DEC プライベート CSI シーケンス (CSI ? params... letter)
+     | SetMouseMode MouseMode           -- ^ マウストラッキングモードの設定
+     | SetMouseEncoding MouseEncoding   -- ^ マウスエンコーディングの設定
      | KeypadKeysApplicationsMode       -- ^ キーパッドをアプリケーションモードに設定 (ESC =)
      | KeypadKeysNumericMode            -- ^ キーパッドを数値モードに設定 (ESC >)
      | SetAttributeMode [AttributeMode] -- ^ SGR 属性の設定 (CSI m)
@@ -160,3 +168,19 @@ tableAM = [ (ResetAllAttributes, 0)
             ++ [(Foreground (Color256 (8 + fromEnum tcol)), 90 + fromEnum tcol) | tcol <- [Black .. White]]
             -- SGR 100-107: 明るい背景色（Color256 8-15 にマッピング）
             ++ [(Background (Color256 (8 + fromEnum tcol)), 100 + fromEnum tcol) | tcol <- [Black .. White]]
+
+-- | マウストラッキングモード。
+--
+-- アプリケーションが CSI ?1000h 等で有効化する。
+data MouseMode
+  = MouseNone       -- ^ マウストラッキング無効
+  | MouseNormal     -- ^ ボタン押下/離上のみ報告 (CSI ?1000h)
+  | MouseButton     -- ^ ボタン押下中のドラッグも報告 (CSI ?1002h)
+  | MouseAll        -- ^ 全モーション報告 (CSI ?1003h)
+  deriving (Show, Eq)
+
+-- | マウスイベントのエンコーディング方式。
+data MouseEncoding
+  = MouseEncodingX10   -- ^ デフォルト X10 互換: ESC [ M Cb Cx Cy
+  | MouseEncodingSGR   -- ^ SGR 拡張: ESC [ < Cb;Cx;Cy M/m (座標 > 223 対応)
+  deriving (Show, Eq)

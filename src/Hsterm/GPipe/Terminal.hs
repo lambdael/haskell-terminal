@@ -18,6 +18,8 @@ import qualified Data.ByteString as BS
 import Data.Char (chr)
 import Data.IORef
 import Data.Maybe (fromJust, fromMaybe)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Foreign.C.Types (CInt(..))
 import System.Environment (getEnvironment)
 import System.IO
@@ -99,12 +101,18 @@ spawnShell = do
 -- 全アクションを一括適用してから writeIORef するので、
 -- 描画スレッドが中間状態を読むことはない。
 runTerminalReader :: IORef Terminal -> IORef Bool -> Handle -> IO ()
-runTerminalReader termRef dirty hOut =
+runTerminalReader termRef dirty hOut = do
+  -- UTF-8 マルチバイト文字が読み取り境界で切断される場合に備え、
+  -- 未完成のバイト列を保持するバッファ。
+  utf8buf <- newIORef BS.empty
   forever $ do
-    -- hGetSome はデータが来るまでブロックし、利用可能なデータを一括読み取り。
-    -- 1 バイトずつ hGetChar + hReady を繰り返すより大幅にシステムコールが減る。
     chunk <- BS.hGetSome hOut 65536
-    let str = map (chr . fromIntegral) (BS.unpack chunk)
+    prevBytes <- readIORef utf8buf
+    let allBytes = if BS.null prevBytes then chunk else BS.append prevBytes chunk
+        -- UTF-8 デコード: 末尾の不完全なマルチバイトシーケンスを分離する
+        (decoded, remainder) = decodeUtf8Partial allBytes
+        str = T.unpack decoded
+    writeIORef utf8buf remainder
     term <- readIORef termRef
 
     let Right (actions, leftover) = parseANSI $ inBuffer term ++ str
@@ -113,14 +121,50 @@ runTerminalReader termRef dirty hOut =
 
     writeIORef dirty True
 
--- | Handle から読めるだけノンブロッキングで読み取る
+-- | UTF-8 バイト列をデコードし、末尾の不完全なシーケンスを分離する。
+-- 完全にデコードできた部分を Text で、残りの不完全バイトを ByteString で返す。
+decodeUtf8Partial :: BS.ByteString -> (T.Text, BS.ByteString)
+decodeUtf8Partial bs
+  | BS.null bs = (T.empty, BS.empty)
+  | otherwise =
+      -- 末尾から不完全な UTF-8 シーケンスを探す（最大3バイト戻る）
+      let len = BS.length bs
+          -- 末尾の不完全バイト数を計算
+          trailLen = incompleteUtf8Tail bs len
+          (complete, trail) = BS.splitAt (len - trailLen) bs
+      in (TE.decodeUtf8With (\_ _ -> Just '\xFFFD') complete, trail)
+
+-- | ByteString の末尾にある不完全な UTF-8 シーケンスのバイト数を返す。
+-- 完全なシーケンスしかない場合は 0 を返す。
+incompleteUtf8Tail :: BS.ByteString -> Int -> Int
+incompleteUtf8Tail bs len
+  | len == 0 = 0
+  | otherwise =
+      -- 末尾から最大 3 バイト戻り、マルチバイト先頭を探す
+      let check n
+            | n > 3 || n > len = 0  -- 4バイト以上戻る必要はない
+            | otherwise =
+                let b = BS.index bs (len - n)
+                in if b < 0x80
+                   then 0  -- ASCII: 完全
+                   else if b >= 0xC0  -- マルチバイト先頭バイト
+                        then let expected
+                                   | b < 0xE0 = 2
+                                   | b < 0xF0 = 3
+                                   | otherwise = 4
+                             in if n < expected then n else 0
+                        else check (n + 1)  -- 継続バイト (0x80-0xBF): さらに戻る
+      in check 1
+
+-- | Handle から読めるだけノンブロッキングで読み取る（UTF-8 デコード）
 drainAvailable :: Handle -> IO String
 drainAvailable h = do
   ready <- hReady h `catch` \(SomeException _) -> return False
   if ready
     then do
       bs <- BS.hGetNonBlocking h 65536
-      return (map (chr . fromIntegral) (BS.unpack bs))
+      let (decoded, _) = decodeUtf8Partial bs
+      return (T.unpack decoded)
     else return []
 
 -- ── helpers ──────────────────────────────────────────────

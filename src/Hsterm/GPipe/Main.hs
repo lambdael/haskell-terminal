@@ -23,7 +23,8 @@ import Data.Colour (Colour)
 
 import Graphics.GPipe
 import qualified Graphics.GPipe.Context.GLFW as GLFW
-import Graphics.GPipe.Context.GLFW (Key(..), KeyState(..), ModifierKeys(..))
+import Graphics.GPipe.Context.GLFW (Key(..), KeyState(..), ModifierKeys(..),
+                                    MouseButton(..), MouseButtonState(..))
 
 import Graphics.GPipe.Font
 import Graphics.GPipe.Font.Types (GlyphMetrics(..), GlyphRegion(..))
@@ -155,7 +156,14 @@ runGPipeTerminal = do
       pixelSize = gpFontSize cfg
 
   -- フォントアトラスを構築
-  atlas <- buildAtlas (defaultTextConfig fontPath) { tcPixelSize = pixelSize }
+  -- ターミナルで使用される文字セット: ASCII + ボックス描画 + ブロック要素 等
+  let termCharSet = [' '..'~']          -- ASCII printable (32-126)
+                 ++ ['\x2500'..'\x257F'] -- Box Drawing
+                 ++ ['\x2580'..'\x259F'] -- Block Elements
+                 ++ ['\x2190'..'\x21FF'] -- Arrows
+                 ++ ['\x25A0'..'\x25FF'] -- Geometric Shapes
+                 ++ ['\x2600'..'\x26FF'] -- Miscellaneous Symbols
+  atlas <- buildAtlas (defaultTextConfig fontPath) { tcPixelSize = pixelSize, tcCharSet = termCharSet }
   putStrLn $ "Atlas: " ++ show (faWidth atlas) ++ "x" ++ show (faHeight atlas)
     ++ ", " ++ show (Map.size (faGlyphs atlas)) ++ " glyphs"
 
@@ -248,6 +256,60 @@ runGPipeTerminal = do
 
     -- ウィンドウサイズ変更コールバック
     winSizeRef <- liftIO $ newIORef (V2 winW winH)
+
+    -- マウスカーソル位置を追跡する（ボタンイベント時にセル座標を計算するため）
+    mousePosRef <- liftIO $ newIORef (0.0 :: Double, 0.0 :: Double)
+    -- マウスボタン押下中フラグ（ドラッグ検出用）
+    mouseBtnRef <- liftIO $ newIORef False
+
+    -- マウスカーソル位置コールバック
+    _ <- GLFW.setCursorPosCallback win $ Just $ \px py -> do
+      writeIORef mousePosRef (px, py)
+      -- MouseAll / MouseButton モード時、移動中もイベント送信
+      term <- readIORef termRef
+      let mode = mouseMode term
+      isDragging <- readIORef mouseBtnRef
+      when (mode == MouseAll || (mode == MouseButton && isDragging)) $ do
+        let col = floor (px / realToFrac cellW) + 1 :: Int
+            row = floor (py / realToFrac cellH) + 1 :: Int
+        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+          let enc = mouseEncoding term
+              -- ボタンコード: ドラッグ中は +32、移動のみ(all mode)は button 3 (no button) + 32
+              cb = if isDragging then 32 else 35 + 32
+          sendPty $ encodeMouseEvent enc cb col row True
+
+    -- マウスボタンコールバック
+    _ <- GLFW.setMouseButtonCallback win $ Just $ \button state _mods -> do
+      term <- readIORef termRef
+      let mode = mouseMode term
+      when (mode /= MouseNone) $ do
+        (px, py) <- readIORef mousePosRef
+        let col = floor (px / realToFrac cellW) + 1 :: Int
+            row = floor (py / realToFrac cellH) + 1 :: Int
+        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+          let enc = mouseEncoding term
+              btn = case button of
+                      MouseButton'1 -> 0  -- left
+                      MouseButton'2 -> 1  -- middle
+                      MouseButton'3 -> 2  -- right
+                      _             -> 0
+              isPress = state == MouseButtonState'Pressed
+          writeIORef mouseBtnRef isPress
+          sendPty $ encodeMouseEvent enc btn col row isPress
+
+    -- スクロールコールバック
+    _ <- GLFW.setScrollCallback win $ Just $ \_ dy -> do
+      term <- readIORef termRef
+      let mode = mouseMode term
+      when (mode /= MouseNone) $ do
+        (px, py) <- readIORef mousePosRef
+        let col = floor (px / realToFrac cellW) + 1 :: Int
+            row = floor (py / realToFrac cellH) + 1 :: Int
+        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+          let enc = mouseEncoding term
+              btn = if dy > 0 then 64 else 65  -- scroll up / down
+          sendPty $ encodeMouseEvent enc btn col row True
+
     _ <- GLFW.setWindowSizeCallback win $ Just $ \w h -> do
       let newCols = floor (fromIntegral w / cellW) :: Int
           newRows = floor (fromIntegral h / cellH) :: Int
@@ -523,3 +585,23 @@ terminalKeyMap =
   , (Key'F11,      TI.functionKey 11)
   , (Key'F12,      TI.functionKey 12)
   ]
+
+-- ── マウスイベントエンコーディング ─────────────────────────
+
+-- | マウスイベントを PTY に送信するエスケープシーケンスにエンコードする。
+--
+-- @encodeMouseEvent encoding buttonCode col row isPress@
+--
+-- * X10 互換: @ESC [ M Cb Cx Cy@ (Cb = button+32, Cx = col+32, Cy = row+32)
+--   リリースは button=3。座標は 223 まで。
+-- * SGR 拡張: @ESC [ < Cb ; Cx ; Cy M@ (press) / @ESC [ < Cb ; Cx ; Cy m@ (release)
+--   座標制限なし。
+encodeMouseEvent :: MouseEncoding -> Int -> Int -> Int -> Bool -> String
+encodeMouseEvent MouseEncodingX10 btn col row isPress =
+  let cb = if isPress then btn + 32 else 3 + 32  -- release = button 3
+      cx = min 255 (col + 32)
+      cy = min 255 (row + 32)
+  in  "\ESC[M" ++ [chr cb, chr cx, chr cy]
+encodeMouseEvent MouseEncodingSGR btn col row isPress =
+  let suffix = if isPress then 'M' else 'm'
+  in  "\ESC[<" ++ show btn ++ ";" ++ show col ++ ";" ++ show row ++ [suffix]

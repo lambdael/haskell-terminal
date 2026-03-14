@@ -104,6 +104,7 @@ executable hsterm-gpipe
     process,
     stm,
     terminfo,
+    text,
     time,
     unix
   default-language: GHC2021

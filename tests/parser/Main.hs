@@ -155,10 +155,10 @@ testShowCursor = "\ESC[?25h\ESC[?25l"
         ==> [ShowCursor True, ShowCursor False]
 
 testPrivateMode = "\ESC[?1h\ESC[?1l"
-        ==> [ANSIAction [1] 'h', ANSIAction [1] 'l']
+        ==> [DECAction [1] 'h', DECAction [1] 'l']
 
 testAltScreen = "\ESC[?1049h\ESC[?1049l"
-        ==> [ANSIAction [1049] 'h', ANSIAction [1049] 'l']
+        ==> [DECAction [1049] 'h', DECAction [1049] 'l']
 
 -- ── ESC シーケンス ──────────────────────────────────────
 
