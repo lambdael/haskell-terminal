@@ -8,6 +8,7 @@ module Terminal.Types (
 import Data.Array
 import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
+import Data.Sequence (Seq)
 import Data.Tuple (swap)
 import Data.Word (Word8)
 import qualified System.Console.Terminfo as TI
@@ -36,6 +37,16 @@ type TerminalScreen = TerminalArray TerminalChar
 -- | 色情報用の整数配列（内部使用）。
 type TerminalColorArray = TerminalArray Int
 
+-- | スクロールバック履歴の1行分。各列の 'TerminalChar' のリスト。
+type ScrollbackLine = [TerminalChar]
+
+-- | 代替画面バッファに切り替わる前の通常画面の状態を保存する。
+data AltScreenState = AltScreenState
+  { asScreen       :: !TerminalScreen
+  , asCursorPos    :: !ScreenIndex
+  , asScrollRegion :: !(Int, Int)
+  }
+
 -- | ターミナル全体の状態。
 --
 -- 画面バッファ（'DiffArray' ベース）、カーソル位置、現在の描画属性、
@@ -59,7 +70,11 @@ data Terminal = Terminal {
     optionBlinking :: Bool,           -- ^ 点滅属性
     mouseMode :: MouseMode,           -- ^ マウストラッキングモード
     mouseEncoding :: MouseEncoding,   -- ^ マウスイベントのエンコーディング
-    pendingWrap :: Bool               -- ^ 行末で次の文字入力まで折り返しを保留するフラグ (DECAWM)
+    pendingWrap :: Bool,              -- ^ 行末で次の文字入力まで折り返しを保留するフラグ (DECAWM)
+    scrollbackBuffer :: Seq ScrollbackLine, -- ^ スクロールバック履歴
+    scrollbackMax :: Int,             -- ^ スクロールバックの最大行数
+    altScreen :: Maybe AltScreenState, -- ^ 代替画面バッファ（'Just' なら代替画面中）
+    savedCursor :: Maybe ScreenIndex  -- ^ DECSC で保存したカーソル位置
 }
 
 -- | パース済みのターミナルアクション。
@@ -92,6 +107,8 @@ data TerminalAction =
      | SetAttributeMode [AttributeMode] -- ^ SGR 属性の設定 (CSI m)
      | SetTerminalTitle String          -- ^ ウィンドウタイトルの設定 (OSC 0;...BEL)
      | ShowCursor Bool                  -- ^ カーソルの表示/非表示 (CSI ?25h / CSI ?25l)
+     | SaveCursorPos                    -- ^ カーソル位置を保存 (DECSC / ESC 7)
+     | RestoreCursorPos                 -- ^ カーソル位置を復元 (DECRC / ESC 8)
      | Ignored                          -- ^ 無視するシーケンス
      deriving (Show, Eq)
 

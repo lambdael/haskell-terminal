@@ -163,18 +163,18 @@ testAltScreen = "\ESC[?1049h\ESC[?1049l"
 -- ── ESC シーケンス ──────────────────────────────────────
 
 testSaveCursor = "\ESC7A"
-        ==> [Ignored, CharInput 'A']
+        ==> [SaveCursorPos, CharInput 'A']
 
 testRestoreCursor = "\ESC8B"
-        ==> [Ignored, CharInput 'B']
+        ==> [RestoreCursorPos, CharInput 'B']
 
 -- ★ ESC 7 の後の CSI シーケンスが食われないことを確認
 -- (以前のバグ: catch-all が次の ESC を消費していた)
 testSaveCursorPreservesNext = "\ESC7\ESC[24;1H"
-        ==> [Ignored, SetCursor 24 1]
+        ==> [SaveCursorPos, SetCursor 24 1]
 
 testRestoreCursorPreservesNext = "\ESC8\ESC[1m"
-        ==> [Ignored, SetAttributeMode [Bright]]
+        ==> [RestoreCursorPos, SetAttributeMode [Bright]]
 
 testKeypadMode = "\ESC=\ESC>"
         ==> [KeypadKeysApplicationsMode, KeypadKeysNumericMode]
@@ -235,10 +235,10 @@ testCompositeHtopLike =
 -- ncurses: save cursor → draw → restore cursor (ESC 7/8 がパーサーを壊さない)
 testCompositeNcursesSaveRestore =
     "\ESC7\ESC[1;1Hstatus\ESC8"
-    ==> [ Ignored              -- ESC 7 (save cursor)
+    ==> [ SaveCursorPos        -- ESC 7 (save cursor)
         , SetCursor 1 1
         , CharInput 's', CharInput 't', CharInput 'a', CharInput 't', CharInput 'u', CharInput 's'
-        , Ignored              -- ESC 8 (restore cursor)
+        , RestoreCursorPos     -- ESC 8 (restore cursor)
         ]
 
 -- ── ユニットテストリスト ────────────────────────────────

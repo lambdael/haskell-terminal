@@ -128,8 +128,8 @@ pANSISequence = try (pStandardANSISeq)
     -- DECSC / DECRC: save/restore cursor (ESC 7 / ESC 8)
     -- ESC + 数字は catch-all で後続シーケンスの ESC を食う可能性があるため
     -- 明示的にハンドルする必要がある。
-    <|> try (string "\ESC7" >> return Ignored)
-    <|> try (string "\ESC8" >> return Ignored)
+    <|> try (string "\ESC7" >> return SaveCursorPos)
+    <|> try (string "\ESC8" >> return RestoreCursorPos)
     -- Catch invalid and not implemented sequences
     -- lookAhead で後続の ESC を消費しないようにする（以前は try (char '\ESC') で
     -- 次のエスケープシーケンスの ESC プレフィクスを食っていた）

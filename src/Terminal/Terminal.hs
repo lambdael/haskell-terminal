@@ -10,6 +10,8 @@ import Data.Array
 import Data.Char
 import Control.Monad
 import Control.Monad.State hiding (state)
+import Data.Maybe (isNothing)
+import qualified Data.Sequence as Seq
 import System.IO
 import System.Posix.IO
 import System.Posix.Terminal hiding (TerminalState)
@@ -62,7 +64,11 @@ setSize s@(r, c) term = let
     terminalTitle = terminalTitle term,
     mouseMode = mouseMode term,
     mouseEncoding = mouseEncoding term,
-    pendingWrap = False
+    pendingWrap = False,
+    scrollbackBuffer = scrollbackBuffer term,
+    scrollbackMax = scrollbackMax term,
+    altScreen = fmap resizeAltScreen (altScreen term),
+    savedCursor = savedCursor term
   }
   or_ = rows term
   oc = cols term
@@ -78,6 +84,20 @@ setSize s@(r, c) term = let
     screen = screen newterm // overlap,
     cursorPos = newCursor
   }
+  where
+    resizeAltScreen as =
+      let oldScr = asScreen as
+          (_, (oldR, oldC)) = bounds oldScr
+          blankScr = array ((1,1), (r,c))
+                       [((y_,x_), blankChar) | y_ <- [1..r], x_ <- [1..c]]
+          ovlp = [((y_,x_), oldScr ! (y_,x_))
+                 | y_ <- [1..min r oldR], x_ <- [1..min c oldC]]
+          (cy_, cx_) = asCursorPos as
+      in as { asScreen = blankScr // ovlp
+            , asCursorPos = (min r (max 1 cy_), min c (max 1 cx_))
+            , asScrollRegion = (1, r)
+            }
+    blankChar = TerminalChar ' ' defaultForegroundColor defaultBackgroundColor False False False False
   -- ixmap ((1::Int,1::Int) , (r, c)) f s
   -- where f (y, x) = let
   --         (_ , (oldr, oldc) ) = bounds s
@@ -108,7 +128,11 @@ newTerminal s@(rows, cols) mterm = Terminal {
     optionInverse = False,
     mouseMode = MouseNone,
     mouseEncoding = MouseEncodingX10,
-    pendingWrap = False
+    pendingWrap = False,
+    scrollbackBuffer = Seq.empty,
+    scrollbackMax = 10000,
+    altScreen = Nothing,
+    savedCursor = Nothing
 } where e = mkEmptyChar (newTerminal s mterm) -- Hail laziness
 
 up t@Terminal {cursorPos = (y, x)} = safeCursor $ t { cursorPos = (y - 1, x), pendingWrap = False }
@@ -150,9 +174,25 @@ scrollTerminalUp term@Terminal { screen = s, scrollingRegion = r@(startrow, endr
 
 scrollTerminalDown :: Terminal -> Terminal
 scrollTerminalDown term@Terminal { screen = s, scrollingRegion = r@(startrow, endrow) } =
-    clearRows [endrow] $ term {
-        screen = scrollScreenDown (scrollingRegion term) s
+    clearRows [endrow] $ term' {
+        screen = scrollScreenDown r s
     }
+  where
+    term' = if startrow == 1 && isNothing (altScreen term)
+            then pushScrollbackLine term
+            else term
+
+-- | スクロール領域の先頭行をスクロールバックに保存する。
+pushScrollbackLine :: Terminal -> Terminal
+pushScrollbackLine term =
+  let s = screen term
+      c = cols term
+      topLine = [s ! (1, x_) | x_ <- [1..c]]
+      buf = scrollbackBuffer term Seq.|> topLine
+      buf' = if Seq.length buf > scrollbackMax term
+             then Seq.drop 1 buf
+             else buf
+  in term { scrollbackBuffer = buf' }
 
 clearRows :: [Int] -> Terminal -> Terminal
 clearRows rows term@Terminal { screen = s, rows = r, cols = c} =
@@ -244,6 +284,10 @@ applyAttributeMode term other = trace ("\nUnimplemented attribute mode: " ++ sho
 -- | DECSET: DEC プライベートモードの個別パラメータ適用。
 applyDECSet :: Terminal -> Int -> Terminal
 applyDECSet term 25   = term { optionShowCursor = True }
+applyDECSet term 47   = switchToAltScreen term
+applyDECSet term 1047 = switchToAltScreen term
+applyDECSet term 1048 = term { savedCursor = Just (cursorPos term) }
+applyDECSet term 1049 = switchToAltScreen $ term { savedCursor = Just (cursorPos term) }
 applyDECSet term 1000 = term { mouseMode = MouseNormal }
 applyDECSet term 1002 = term { mouseMode = MouseButton }
 applyDECSet term 1003 = term { mouseMode = MouseAll }
@@ -253,11 +297,75 @@ applyDECSet term _    = term
 -- | DECRST: DEC プライベートモードの個別パラメータリセット。
 applyDECReset :: Terminal -> Int -> Terminal
 applyDECReset term 25   = term { optionShowCursor = False }
+applyDECReset term 47   = switchToNormalScreen term
+applyDECReset term 1047 = switchToNormalScreen term
+applyDECReset term 1048 = restoreSavedCursor term
+applyDECReset term 1049 = restoreSavedCursor $ switchToNormalScreen term
 applyDECReset term 1000 = term { mouseMode = MouseNone }
 applyDECReset term 1002 = term { mouseMode = MouseNone }
 applyDECReset term 1003 = term { mouseMode = MouseNone }
 applyDECReset term 1006 = term { mouseEncoding = MouseEncodingX10 }
 applyDECReset term _    = term
+
+-- | 代替画面バッファに切り替える。
+-- 通常画面の状態を保存し、空の画面を作成する。
+switchToAltScreen :: Terminal -> Terminal
+switchToAltScreen term
+  | isJust_ (altScreen term) = term  -- 既に代替画面
+  | otherwise =
+      let saved = AltScreenState
+            { asScreen = screen term
+            , asCursorPos = cursorPos term
+            , asScrollRegion = scrollingRegion term
+            }
+          r = rows term
+          c = cols term
+          blank = array ((1,1), (r,c))
+                    [((y_,x_), e) | y_ <- [1..r], x_ <- [1..c]]
+          e = TerminalChar ' ' defaultForegroundColor defaultBackgroundColor False False False False
+      in term { altScreen = Just saved
+              , screen = blank
+              , cursorPos = (1, 1)
+              , scrollingRegion = (1, r)
+              , pendingWrap = False
+              }
+
+-- | 通常画面バッファに戻る。
+-- 保存した画面の状態を復元する。
+switchToNormalScreen :: Terminal -> Terminal
+switchToNormalScreen term = case altScreen term of
+  Nothing -> term  -- 既に通常画面
+  Just saved ->
+    let r = rows term
+        c = cols term
+        oldScreen = asScreen saved
+        (_, (oldR, oldC)) = bounds oldScreen
+        newScreen = if oldR == r && oldC == c
+                    then oldScreen
+                    else let blank = array ((1,1), (r,c))
+                               [((y_,x_), e) | y_ <- [1..r], x_ <- [1..c]]
+                             e = TerminalChar ' ' defaultForegroundColor defaultBackgroundColor False False False False
+                             ovlp = [((y_,x_), oldScreen ! (y_,x_))
+                                    | y_ <- [1..min r oldR], x_ <- [1..min c oldC]]
+                         in blank // ovlp
+        (cy_, cx_) = asCursorPos saved
+    in term { altScreen = Nothing
+            , screen = newScreen
+            , cursorPos = (min r (max 1 cy_), min c (max 1 cx_))
+            , scrollingRegion = (1, r)
+            , pendingWrap = False
+            }
+
+-- | 保存したカーソル位置を復元する。
+restoreSavedCursor :: Terminal -> Terminal
+restoreSavedCursor term = case savedCursor term of
+  Nothing  -> term
+  Just pos -> safeCursor $ term { cursorPos = pos, savedCursor = Nothing, pendingWrap = False }
+
+-- | Maybe が Just か判定する（Data.Maybe.isJust を使わず定義）。
+isJust_ :: Maybe a -> Bool
+isJust_ (Just _) = True
+isJust_ Nothing  = False
 
 
 applyAction :: Terminal -> TerminalAction -> Terminal
@@ -331,6 +439,10 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             -- Cursor visibility
             ShowCursor s        -> term { optionShowCursor = s }
 
+            -- Cursor save/restore (DECSC/DECRC)
+            SaveCursorPos       -> term { savedCursor = Just pos }
+            RestoreCursorPos    -> restoreSavedCursor term
+
             -- Colors, yay!
             ANSIAction _ 'm'    -> term
 
@@ -391,9 +503,9 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             SetMouseMode m     -> term { mouseMode = m }
             SetMouseEncoding e -> term { mouseEncoding = e }
 
-            -- ANSI save/restore cursor (CSI s / CSI u) — no-op
-            ANSIAction [] 's'   -> term
-            ANSIAction [] 'u'   -> term
+            -- ANSI save/restore cursor (CSI s / CSI u)
+            ANSIAction [] 's'   -> term { savedCursor = Just pos }
+            ANSIAction [] 'u'   -> restoreSavedCursor term
          
             -- Set the terminal title
             SetTerminalTitle t  -> term { terminalTitle = t }
@@ -499,14 +611,24 @@ applyActionsBatched term actions = go term actions []
       go (term { scrollingRegion = (s, e), pendingWrap = False }) rest pending
     go term (ANSIAction [] 'r' : rest) pending =
       go (term { scrollingRegion = (1, rows term), pendingWrap = False }) rest pending
-    go term (DECAction ps 'h' : rest) pending = go (foldl applyDECSet term ps) rest pending
-    go term (DECAction ps 'l' : rest) pending = go (foldl applyDECReset term ps) rest pending
+    go term (DECAction ps 'h' : rest) pending =
+      let term' = flush term pending
+      in go (foldl applyDECSet term' ps) rest []
+    go term (DECAction ps 'l' : rest) pending =
+      let term' = flush term pending
+      in go (foldl applyDECReset term' ps) rest []
     go term (SetMouseMode m : rest) pending =
       go (term { mouseMode = m }) rest pending
     go term (SetMouseEncoding e : rest) pending =
       go (term { mouseEncoding = e }) rest pending
-    go term (ANSIAction [] 's' : rest) pending = go term rest pending
-    go term (ANSIAction [] 'u' : rest) pending = go term rest pending
+    go term (SaveCursorPos : rest) pending =
+      go (term { savedCursor = Just (cursorPos term) }) rest pending
+    go term (RestoreCursorPos : rest) pending =
+      go (restoreSavedCursor term) rest pending
+    go term (ANSIAction [] 's' : rest) pending =
+      go (term { savedCursor = Just (cursorPos term) }) rest pending
+    go term (ANSIAction [] 'u' : rest) pending =
+      go (restoreSavedCursor term) rest pending
     go term (ANSIAction _ 'm' : rest) pending = go term rest pending
 
     -- その他（スクロール、消去、文字削除/挿入 等）:

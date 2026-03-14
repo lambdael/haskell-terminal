@@ -29,6 +29,7 @@ import Graphics.GPipe.Context.GLFW (Key(..), KeyState(..), ModifierKeys(..),
 import Graphics.GPipe.Font
 import Graphics.GPipe.Font.Types (GlyphMetrics(..), GlyphRegion(..))
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 
 import System.Posix.IOCtl (ioctl)
 import System.Posix.Signals (signalProcess, sigINT, sigTERM, installHandler, Handler(..))
@@ -185,6 +186,7 @@ runGPipeTerminal = do
   termInfo <- TI.setupTermFromEnv
   termRef <- newIORef $ newTerminal (initRows, initCols) (Just termInfo)
   dirty   <- newIORef True
+  scrollOffsetRef <- newIORef (0 :: Int)
 
   -- PTY 読み取りスレッド
   _ <- forkIO $ runTerminalReader termRef dirty (ptyMaster pty)
@@ -214,7 +216,9 @@ runGPipeTerminal = do
     -- Ctrl が押されている間は charCallback を無視する。
     _ <- GLFW.setCharCallback win $ Just $ \ch -> do
       isCtrl <- readIORef ctrlHeld
-      unless isCtrl $ sendPty [ch]
+      unless isCtrl $ do
+        writeIORef scrollOffsetRef 0
+        sendPty [ch]
 
     -- キー入力コールバック（制御キー用）
     _ <- GLFW.setKeyCallback win $ Just $ \key _scancode keyState mods -> do
@@ -222,7 +226,30 @@ runGPipeTerminal = do
       -- Ctrl の状態を記録
       liftIO $ writeIORef ctrlHeld ctrl
       when (keyState == KeyState'Pressed || keyState == KeyState'Repeating) $ do
-        case key of
+        let shift = modifierKeysShift mods
+            isScrollKey = shift && key `elem` [Key'PageUp, Key'PageDown, Key'Home, Key'End]
+        -- スクロールバック操作（Shift+PageUp/Down/Home/End）
+        when (shift && key == Key'PageUp) $ do
+          term <- readIORef termRef
+          let maxOff = Seq.length (scrollbackBuffer term)
+              pageSize = max 1 (rows term - 1)
+          modifyIORef' scrollOffsetRef (\off -> min maxOff (off + pageSize))
+          writeIORef dirty True
+        when (shift && key == Key'PageDown) $ do
+          term <- readIORef termRef
+          let pageSize = max 1 (rows term - 1)
+          modifyIORef' scrollOffsetRef (\off -> max 0 (off - pageSize))
+          writeIORef dirty True
+        when (shift && key == Key'Home) $ do
+          term <- readIORef termRef
+          writeIORef scrollOffsetRef (Seq.length (scrollbackBuffer term))
+          writeIORef dirty True
+        when (shift && key == Key'End) $ do
+          writeIORef scrollOffsetRef 0
+          writeIORef dirty True
+        -- 通常キー入力時はスクロール位置をリセット
+        when (not isScrollKey) $ writeIORef scrollOffsetRef 0
+        when (not isScrollKey) $ case key of
           -- Ctrl+Q で強制終了
           Key'Q | ctrl -> do
             signalProcess sigINT (ptyPid pty)
@@ -328,7 +355,7 @@ runGPipeTerminal = do
         signalProcess 28 (ptyPid pty)  -- SIGWINCH
 
     -- メインループ
-    mainLoop win fontTex atlas cfg termRef dirty winSizeRef (ptyPid pty)
+    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef (ptyPid pty)
 
 -- | メインループ。
 --
@@ -352,9 +379,10 @@ mainLoop
   -> IORef Terminal
   -> IORef Bool
   -> IORef (V2 Int)
+  -> IORef Int        -- ^ scrollOffsetRef
   -> CPid
   -> ContextT GLFW.Handle os IO ()
-mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
+mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef pid = do
   -- ウィンドウサイズを取得
   winSize <- liftIO $ readIORef winSizeRef
 
@@ -464,8 +492,9 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
       posTex <- liftIO $ readIORef posTexRef
 
       when (isDirty || resized) $ do
+        scrollOff <- liftIO $ readIORef scrollOffsetRef
         let (bgColors, fgColors, glyphUVs, glyphPositions) =
-              buildCellData atlas term colorFn
+              buildCellData atlas term colorFn scrollOff
             texSize = V2 c r
 
         writeTexture2D bgTex  0 0 texSize bgColors
@@ -473,8 +502,10 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
         writeTexture2D uvTex  0 0 texSize glyphUVs
         writeTexture2D posTex 0 0 texSize glyphPositions
 
-        -- カーソル頂点を更新
-        let cursorVerts = buildCursorVertices atlas term (gpCursorColor cfg)
+        -- カーソル頂点を更新（スクロールバック表示中はカーソル非表示）
+        let cursorVerts = if scrollOff > 0
+                          then []
+                          else buildCursorVertices atlas term (gpCursorColor cfg)
             curLen = length cursorVerts
         liftIO $ writeIORef curLenRef curLen
         when (curLen > 0) $ do

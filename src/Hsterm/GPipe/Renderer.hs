@@ -25,8 +25,9 @@ module Hsterm.GPipe.Renderer
   , cellWidth
   ) where
 
-import Data.Array (indices, (!))
+import Data.Array (indices, (!), bounds)
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 
 import Graphics.GPipe
 import Linear (V2(..), V4(..))
@@ -283,22 +284,48 @@ buildTextGridVertices atlas r c =
 -- * fgColor:  各セルの前景色 (RGBA)
 -- * glyphUV:  各セルのアトラス UV 矩形 (u0,v0,u1,v1)
 -- * glyphPos: 各セルのグリフ位置情報 (offsetX, offsetY, width, height)
+--
+-- @scrollOffset@ が正の場合、スクロールバック履歴を表示する。
 buildCellData
   :: FontAtlas
   -> Terminal
   -> (Bool -> TerminalColor -> V4 Float)
+  -> Int    -- ^ scrollOffset (0 = 通常表示, >0 = 履歴をスクロール表示)
   -> ( [V4 Float]   -- ^ bgColor per cell
      , [V4 Float]   -- ^ fgColor per cell
      , [V4 Float]   -- ^ glyphUV (u0,v0,u1,v1) per cell
      , [V4 Float]   -- ^ glyphPos (ox,oy,w,h) per cell
      )
-buildCellData atlas term colorFn =
+buildCellData atlas term colorFn scrollOffset =
   unzip4 $ map cellData (indices (screen term))
   where
     asc = fromIntegral (faAscender atlas) :: Float
+    sbuf = scrollbackBuffer term
+    sbLen = Seq.length sbuf
+    r = rows term
+    c = cols term
+
+    -- | スクロールオフセットを考慮してセルの文字を取得する。
+    lookupCell (y, x)
+      | scrollOffset <= 0 = screen term ! (y, x)
+      | otherwise =
+          let vIdx = sbLen - scrollOffset + (y - 1)
+          in if vIdx < 0
+             then emptyChar
+             else if vIdx < sbLen
+                  then let line = Seq.index sbuf vIdx
+                       in if x >= 1 && x <= length line
+                          then line !! (x - 1)
+                          else emptyChar
+                  else let screenRow = vIdx - sbLen + 1
+                       in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c
+                          then screen term ! (screenRow, x)
+                          else emptyChar
+
+    emptyChar = TerminalChar ' ' (currentForeground term) (currentBackground term) False False False False
 
     cellData (y, x) =
-      let tc  = screen term ! (y, x)
+      let tc  = lookupCell (y, x)
           bgc = if isInverse tc then foregroundColor tc else backgroundColor tc
           fgc = if isInverse tc then backgroundColor tc else foregroundColor tc
           bgCol = colorFn False bgc
