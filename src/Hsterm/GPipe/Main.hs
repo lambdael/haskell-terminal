@@ -328,14 +328,21 @@ runGPipeTerminal = do
     _ <- GLFW.setScrollCallback win $ Just $ \_ dy -> do
       term <- readIORef termRef
       let mode = mouseMode term
-      when (mode /= MouseNone) $ do
-        (px, py) <- readIORef mousePosRef
-        let col = floor (px / realToFrac cellW) + 1 :: Int
-            row = floor (py / realToFrac cellH) + 1 :: Int
-        when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
-          let enc = mouseEncoding term
-              btn = if dy > 0 then 64 else 65  -- scroll up / down
-          sendPty $ encodeMouseEvent enc btn col row True
+      if mode /= MouseNone
+        then do
+          (px, py) <- readIORef mousePosRef
+          let col = floor (px / realToFrac cellW) + 1 :: Int
+              row = floor (py / realToFrac cellH) + 1 :: Int
+          when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
+            let enc = mouseEncoding term
+                btn = if dy > 0 then 64 else 65  -- scroll up / down
+            sendPty $ encodeMouseEvent enc btn col row True
+        else do
+          -- マウスモード無効時: スクロールバック操作
+          let maxOff = Seq.length (scrollbackBuffer term)
+              step = if dy > 0 then 3 else -3
+          modifyIORef' scrollOffsetRef (\off -> max 0 (min maxOff (off + step)))
+          writeIORef dirty True
 
     _ <- GLFW.setWindowSizeCallback win $ Just $ \w h -> do
       let newCols = floor (fromIntegral w / cellW) :: Int
