@@ -361,6 +361,7 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
             return (ts, bs, cs)
           else return (textShader, bgShader, curShader)
 
+      isDirty <- liftIO $ readIORef dirty
       liftIO $ writeIORef dirty False
 
       -- ターミナル状態を取得
@@ -371,7 +372,8 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
 
       -- ターミナルサイズが変わったら固定グリッドバッファとテクスチャを再確保
       prevDim <- liftIO $ readIORef prevDimRef
-      when ((r, c) /= prevDim) $ do
+      let resized = (r, c) /= prevDim
+      when resized $ do
         liftIO $ writeIORef prevDimRef (r, c)
 
         -- 固定グリッドバッファ再生成
@@ -392,28 +394,30 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef pid = do
         liftIO $ writeIORef uvTexRef uvT
         liftIO $ writeIORef posTexRef posT
 
-      -- セルデータテクスチャを毎フレーム更新
+      -- セルデータテクスチャを dirty 時のみ更新
+      -- テクスチャは GPU に保持されるため、変更がなければ再アップロード不要。
       bgTex  <- liftIO $ readIORef bgTexRef
       fgTex  <- liftIO $ readIORef fgTexRef
       uvTex  <- liftIO $ readIORef uvTexRef
       posTex <- liftIO $ readIORef posTexRef
 
-      let (bgColors, fgColors, glyphUVs, glyphPositions) =
-            buildCellData atlas term colorFn
-          texSize = V2 c r
+      when (isDirty || resized) $ do
+        let (bgColors, fgColors, glyphUVs, glyphPositions) =
+              buildCellData atlas term colorFn
+            texSize = V2 c r
 
-      writeTexture2D bgTex  0 0 texSize bgColors
-      writeTexture2D fgTex  0 0 texSize fgColors
-      writeTexture2D uvTex  0 0 texSize glyphUVs
-      writeTexture2D posTex 0 0 texSize glyphPositions
+        writeTexture2D bgTex  0 0 texSize bgColors
+        writeTexture2D fgTex  0 0 texSize fgColors
+        writeTexture2D uvTex  0 0 texSize glyphUVs
+        writeTexture2D posTex 0 0 texSize glyphPositions
 
-      -- カーソル頂点を更新
-      let cursorVerts = buildCursorVertices atlas term (gpCursorColor cfg)
-          curLen = length cursorVerts
-      liftIO $ writeIORef curLenRef curLen
-      when (curLen > 0) $ do
-        curBuf <- liftIO $ readIORef curBufRef
-        writeBuffer curBuf 0 cursorVerts
+        -- カーソル頂点を更新
+        let cursorVerts = buildCursorVertices atlas term (gpCursorColor cfg)
+            curLen = length cursorVerts
+        liftIO $ writeIORef curLenRef curLen
+        when (curLen > 0) $ do
+          curBuf <- liftIO $ readIORef curBufRef
+          writeBuffer curBuf 0 cursorVerts
 
       -- 描画
       bgGridBuf  <- liftIO $ readIORef bgGridRef

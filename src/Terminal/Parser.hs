@@ -114,15 +114,22 @@ pANSISequence = try (pStandardANSISeq)
     <|> try (string "\ESC>" >> return KeypadKeysNumericMode)
     <|> try (string "\ESC(B" >> return Ignored)
     <|> try (string "\ESC#8" >> return Ignored)
+    -- DECSC / DECRC: save/restore cursor (ESC 7 / ESC 8)
+    -- ESC + 数字は catch-all で後続シーケンスの ESC を食う可能性があるため
+    -- 明示的にハンドルする必要がある。
+    <|> try (string "\ESC7" >> return Ignored)
+    <|> try (string "\ESC8" >> return Ignored)
     -- Catch invalid and not implemented sequences
-    <|> try (string "\ESC" >> notFollowedBy (string "]0;") >> manyTill anyNonEscapeChar (letter <|> try (char '\ESC')) >> return Ignored)
+    -- lookAhead で後続の ESC を消費しないようにする（以前は try (char '\ESC') で
+    -- 次のエスケープシーケンスの ESC プレフィクスを食っていた）
+    <|> try (string "\ESC" >> notFollowedBy (string "]0;") >> manyTill anyNonEscapeChar (letter <|> lookAhead (char '\ESC')) >> return Ignored)
 
 pStandardANSISeq = do
     string "\ESC["
     optionMaybe (char '?')
     param <- optionMaybe pNumber
     params <- many (try (char ';' >> pNumber))
-    c <- letter
+    c <- letter <|> char '@' <|> char '`'
     return $ ANSIAction (maybeToList param ++ params) c
 
 pSetTerminalTitle = do

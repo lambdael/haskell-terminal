@@ -14,8 +14,9 @@ module Hsterm.GPipe.Terminal
 import Control.Concurrent (forkIO)
 import Control.Exception (SomeException(..), catch)
 import Control.Monad (forever, forM_)
+import qualified Data.ByteString as BS
+import Data.Char (chr)
 import Data.IORef
-import Data.List (foldl')
 import Data.Maybe (fromJust, fromMaybe)
 import Foreign.C.Types (CInt(..))
 import System.Environment (getEnvironment)
@@ -27,7 +28,7 @@ import System.Posix.Terminal hiding (TerminalState)
 import System.Posix.Types (CPid, Fd)
 
 import Terminal.Parser (parseANSI)
-import Terminal.Terminal
+import Terminal.Terminal (applyActionsBatched, newTerminal, setSize)
 import Terminal.Types
 
 -- | TIOCSCTTY ioctl — スレーブ PTY を制御端末に設定する。
@@ -100,13 +101,14 @@ spawnShell = do
 runTerminalReader :: IORef Terminal -> IORef Bool -> Handle -> IO ()
 runTerminalReader termRef dirty hOut =
   forever $ do
-    c    <- hGetChar hOut
-    rest <- drainAvailable hOut
+    -- hGetSome はデータが来るまでブロックし、利用可能なデータを一括読み取り。
+    -- 1 バイトずつ hGetChar + hReady を繰り返すより大幅にシステムコールが減る。
+    chunk <- BS.hGetSome hOut 65536
+    let str = map (chr . fromIntegral) (BS.unpack chunk)
     term <- readIORef termRef
 
-    Right (actions, leftover) <- return $ parseANSI $ inBuffer term ++ (c : rest)
-
-    let !term' = foldl' applyAction term actions
+    let Right (actions, leftover) = parseANSI $ inBuffer term ++ str
+        !term' = applyActionsBatched term actions
     writeIORef termRef $ term' { inBuffer = leftover }
 
     writeIORef dirty True
@@ -117,9 +119,8 @@ drainAvailable h = do
   ready <- hReady h `catch` \(SomeException _) -> return False
   if ready
     then do
-      c    <- hGetChar h
-      rest <- drainAvailable h
-      return (c : rest)
+      bs <- BS.hGetNonBlocking h 65536
+      return (map (chr . fromIntegral) (BS.unpack bs))
     else return []
 
 -- ── helpers ──────────────────────────────────────────────

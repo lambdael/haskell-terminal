@@ -4,7 +4,7 @@
 -- 'TerminalAction' を 'Terminal' に適用して状態を遷移させる純粋関数を提供する。
 -- カーソル移動、スクロール、文字書き込み、属性変更、画面消去、
 -- リサイズなどのターミナル操作を実装する。
-module Terminal.Terminal (newTerminal, defaultTerm, applyAction, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
+module Terminal.Terminal (newTerminal, defaultTerm, applyAction, applyActionsBatched, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
 import System.Process
 import Data.Array
 import Data.Char
@@ -160,6 +160,43 @@ clearColumns :: Int -> [Int] -> Terminal -> Terminal
 clearColumns row cols term@Terminal { screen = s } =
     write term [((row,x_), mkEmptyChar term)|x_<-cols] 
 
+-- | DCH: カーソル位置から n 文字を削除し、残りを左にシフト。
+-- 右端に空白を埋める。
+deleteChars :: Int -> Int -> Int -> Int -> Terminal -> Terminal
+deleteChars n row cx maxCol term@Terminal { screen = s } =
+    let shifted = [((row, col), s ! (row, col + n)) | col <- [cx .. maxCol - n], col + n <= maxCol]
+        blanks  = [((row, col), mkEmptyChar term) | col <- [max cx (maxCol - n + 1) .. maxCol]]
+    in  write term (shifted ++ blanks)
+
+-- | ICH: カーソル位置に n 個の空白を挿入し、既存文字を右にシフト。
+-- 右端からはみ出した文字は消える。
+insertChars :: Int -> Int -> Int -> Int -> Terminal -> Terminal
+insertChars n row cx maxCol term@Terminal { screen = s } =
+    let shifted = [((row, col + n), s ! (row, col)) | col <- reverse [cx .. maxCol - n]]
+        blanks  = [((row, col), mkEmptyChar term) | col <- [cx .. min (cx + n - 1) maxCol]]
+    in  write term (shifted ++ blanks)
+
+-- | DL: カーソル行から n 行を削除し、残りを上にシフト。
+-- スクロール領域の下端に空白行を埋める。
+deleteLines :: Int -> Terminal -> Terminal
+deleteLines n term@Terminal { screen = s, scrollingRegion = (srTop, srBot), cols = maxCol } =
+    let cy = fst (cursorPos term)
+        shifted = [((row, col), s ! (row + n, col))
+                  | row <- [cy .. srBot - n], row + n <= srBot, col <- [1..maxCol]]
+        blanks  = [((row, col), mkEmptyChar term)
+                  | row <- [max cy (srBot - n + 1) .. srBot], col <- [1..maxCol]]
+    in  write term (shifted ++ blanks)
+
+-- | IL: カーソル行に n 行の空白を挿入し、既存行を下にシフト。
+-- スクロール領域の下端からはみ出した行は消える。
+insertLines :: Int -> Terminal -> Terminal
+insertLines n term@Terminal { screen = s, scrollingRegion = (srTop, srBot), cols = maxCol } =
+    let cy = fst (cursorPos term)
+        shifted = [((row + n, col), s ! (row, col))
+                  | row <- reverse [cy .. srBot - n], col <- [1..maxCol]]
+        blanks  = [((row, col), mkEmptyChar term)
+                  | row <- [cy .. min (cy + n - 1) srBot], col <- [1..maxCol]]
+    in  write term (shifted ++ blanks)
 
 write :: Terminal -> [((Int,Int), TerminalChar)] -> Terminal
 write term@Terminal {screen=s, rows=r, cols=c} l = 
@@ -227,11 +264,14 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
 
             -- Newline (LF)
             -- スクロール領域の底にいる場合は領域内スクロール
+            -- 画面の絶対底にいてスクロール領域外の場合はスクロールしない
             CharInput '\n'      ->
               let (_, srBot) = scrollingRegion term
               in if y == srBot
                  then scrollTerminalDown $ term { cursorPos = (srBot, 1) }
-                 else curpos (y + 1, 1) term
+                 else if y >= r
+                   then term { cursorPos = (r, 1) }  -- 絶対底: スクロールしない
+                   else curpos (y + 1, 1) term
             CharInput '\r'      -> curpos (y, 1) term
             CharInput '\b'      -> curpos (y, x - 1) $ write' [(pos, mkEmptyChar term)] term
             CharInput c         -> curpos (y, x + 1) $ write' [(pos, mkChar c term)] term 
@@ -253,17 +293,21 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
 
             -- Scrolling
             SetScrollingRegion start end -> term { scrollingRegion = (start, end) }
+            -- CSI r (パラメータなし): スクロール領域を画面全体にリセット
+            ANSIAction [] 'r'   -> term { scrollingRegion = (1, r) }
             ScrollUp n          -> (iterate scrollTerminalUp term) !! n
             ScrollDown n        -> (iterate scrollTerminalDown term) !! n
 
             -- Erases the screen with the background color and moves the cursor to home.
             ANSIAction [2] 'J'  -> clearRows [1..r] $ term { cursorPos = (1, 1) }
 
-            -- Erases the screen from the current line up to the top of the screen.
-            ANSIAction [1] 'J'  -> clearRows [1..y] term
+            -- Erases the screen from the beginning to the cursor position.
+            ANSIAction [1] 'J'  ->
+              clearRows [1..y-1] $ clearColumns y [1..x] term
 
-            -- Erases the screen from the current line down to the bottom of the screen.
-            ANSIAction _ 'J'    -> clearRows [y..r] term
+            -- Erases the screen from the cursor position to the end of the screen.
+            ANSIAction _ 'J'    ->
+              clearRows [y+1..r] $ clearColumns y [x..c] term
 
             -- Erases the entire current line.
             ANSIAction [2] 'K'  -> clearColumns y [1..c] term
@@ -274,12 +318,35 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             -- Erases from the current cursor position to the end of the current line. 
             ANSIAction _ 'K'    -> clearColumns y [x..c] term
 
-            ANSIAction [n] 'X'    -> clearColumns y [x..(n+x)] term
-            -- Set Mode. 
-            ANSIAction _ 'h'    -> clearColumns y [x..c] term
+            -- ECH: カーソル位置から n 文字を消去
+            ANSIAction [] 'X'   -> clearColumns y [x..x] term
+            ANSIAction [n] 'X'  -> clearColumns y [x..min (x+n-1) c] term
 
-            -- Reset Mode. 
-            ANSIAction _ 'l'    -> clearColumns y [x..c] term
+            -- DCH: カーソル位置から n 文字を削除し残りを左シフト
+            ANSIAction [] 'P'   -> deleteChars 1 y x c term
+            ANSIAction [n] 'P'  -> deleteChars n y x c term
+
+            -- ICH: カーソル位置に n 個の空白を挿入し既存文字を右シフト
+            ANSIAction [] '@'   -> insertChars 1 y x c term
+            ANSIAction [n] '@'  -> insertChars n y x c term
+
+            -- DL: カーソル行から n 行を削除し残りを上シフト
+            ANSIAction [] 'M'   -> deleteLines 1 term
+            ANSIAction [n] 'M'  -> deleteLines n term
+
+            -- IL: カーソル行に n 行の空白を挿入し既存行を下シフト
+            ANSIAction [] 'L'   -> insertLines 1 term
+            ANSIAction [n] 'L'  -> insertLines n term
+
+            -- Set Mode (DECSET) — 未実装モードは no-op
+            ANSIAction _ 'h'    -> term
+
+            -- Reset Mode (DECRST) — 未実装モードは no-op
+            ANSIAction _ 'l'    -> term
+
+            -- ANSI save/restore cursor (CSI s / CSI u) — no-op
+            ANSIAction [] 's'   -> term
+            ANSIAction [] 'u'   -> term
          
             -- Set the terminal title
             SetTerminalTitle t  -> term { terminalTitle = t }
@@ -293,4 +360,84 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             KeypadKeysNumericMode      -> term
 
             _                   -> trace ("\nTerminal.hs Unimplemented action: " ++ show act) term
+
+-- | 'applyAction' のバッチ最適化版。
+--
+-- 連続する通常文字入力の画面書き込みを蓄積し、一括で @Array (//)@ に反映する。
+-- @(//)@ は呼び出しごとに配列全体をコピーするため、1 文字ずつ呼ぶと
+-- @O(actions × cells)@ のコストがかかるが、まとめて適用すると
+-- @O(actions + cells)@ で済む。
+--
+-- SGR・カーソル移動など画面バッファに触れないアクションは蓄積中でも
+-- フラッシュせずにインラインで処理するため、htop のような
+-- "SetCursor → SGR → 文字列" パターンでバッチが途切れない。
+applyActionsBatched :: Terminal -> [TerminalAction] -> Terminal
+applyActionsBatched term [] = term
+applyActionsBatched term actions = go term actions []
+  where
+    -- 入力終了: 蓄積した書き込みを反映
+    go term [] pending = flush term pending
+
+    -- 通常文字入力: 画面書き込みを蓄積しカーソルだけ進める
+    go term (CharInput c : rest) pending
+      | c /= '\a', c /= '\t', c /= '\n', c /= '\r', c /= '\b'
+      , let (y, x) = cursorPos term
+      , x >= 1, y >= 1, x < cols term, y <= rows term
+      = go (term { cursorPos = (y, x + 1) })
+           rest
+           (((y, x), mkChar c term) : pending)
+
+    -- SGR (色・属性変更): 画面は触らない
+    go term (SetAttributeMode ms : rest) pending =
+      go (foldl applyAttributeMode term ms) rest pending
+
+    -- カーソル移動: 画面は触らない（クランプのみ）
+    go term (SetCursor row col : rest) pending =
+      let y' = min (rows term) (max 1 row)
+          x' = min (cols term) (max 1 col)
+      in go (term { cursorPos = (y', x') }) rest pending
+    go term (CursorUp n : rest) pending =
+      let (y, x) = cursorPos term
+      in go (term { cursorPos = (max 1 (y - n), x) }) rest pending
+    go term (CursorDown n : rest) pending =
+      let (y, x) = cursorPos term
+      in go (term { cursorPos = (min (rows term) (y + n), x) }) rest pending
+    go term (CursorForward n : rest) pending =
+      let (y, x) = cursorPos term
+      in go (term { cursorPos = (y, min (cols term) (x + n)) }) rest pending
+    go term (CursorBackward n : rest) pending =
+      let (y, x) = cursorPos term
+      in go (term { cursorPos = (y, max 1 (x - n)) }) rest pending
+    go term (CursorAbsoluteColumn col : rest) pending =
+      let (y, _) = cursorPos term
+      in go (term { cursorPos = (y, min (cols term) (max 1 col)) }) rest pending
+    go term (CursorAbsoluteRow row : rest) pending =
+      let (_, x) = cursorPos term
+      in go (term { cursorPos = (min (rows term) (max 1 row), x) }) rest pending
+
+    -- no-op 系: 画面は触らない
+    go term (Ignored : rest) pending = go term rest pending
+    go term (ShowCursor s : rest) pending =
+      go (term { optionShowCursor = s }) rest pending
+    go term (SetTerminalTitle t : rest) pending =
+      go (term { terminalTitle = t }) rest pending
+    go term (KeypadKeysApplicationsMode : rest) pending = go term rest pending
+    go term (KeypadKeysNumericMode : rest) pending = go term rest pending
+    go term (SetScrollingRegion s e : rest) pending =
+      go (term { scrollingRegion = (s, e) }) rest pending
+    go term (ANSIAction [] 'r' : rest) pending =
+      go (term { scrollingRegion = (1, rows term) }) rest pending
+    go term (ANSIAction _ 'h' : rest) pending = go term rest pending
+    go term (ANSIAction _ 'l' : rest) pending = go term rest pending
+    go term (ANSIAction [] 's' : rest) pending = go term rest pending
+    go term (ANSIAction [] 'u' : rest) pending = go term rest pending
+    go term (ANSIAction _ 'm' : rest) pending = go term rest pending
+
+    -- その他（スクロール、消去、文字削除/挿入 等）:
+    -- 蓄積した書き込みを反映してから applyAction で処理
+    go term (act : rest) pending =
+      go (applyAction (flush term pending) act) rest []
+
+    flush term [] = term
+    flush term@Terminal{screen = s} ws = term { screen = s // ws }
 
