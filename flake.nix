@@ -39,23 +39,35 @@
         };
 
         terminal = haskellPackages.Terminal;
+
+        # GHC with our library packages available, for Dyre recompilation
+        ghcForDyre = haskellPackages.ghcWithPackages (p: [
+          p.Terminal
+        ]);
+
+        # Wrapped binary with GHC in PATH so Dyre can recompile the user config
+        wrappedTerminal = pkgs.symlinkJoin {
+          name = "hsterm-gpipe-wrapped";
+          paths = [ terminal ];
+          buildInputs = [ pkgs.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/hsterm-gpipe \
+              --prefix PATH : ${ghcForDyre}/bin
+          '';
+        };
       in
       {
-        packages.default = terminal;
+        packages.default = wrappedTerminal;
+        packages.unwrapped = terminal;
 
         apps.default = {
           type = "app";
-          program = "${terminal}/bin/hsterm-gpipe";
-        };
-
-        apps.hsterm = {
-          type = "app";
-          program = "${terminal}/bin/hsterm";
+          program = "${wrappedTerminal}/bin/hsterm-gpipe";
         };
 
         apps.hsterm-gpipe = {
           type = "app";
-          program = "${terminal}/bin/hsterm-gpipe";
+          program = "${wrappedTerminal}/bin/hsterm-gpipe";
         };
 
         devShells.default = haskellPackages.shellFor {

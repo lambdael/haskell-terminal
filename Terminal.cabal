@@ -24,77 +24,23 @@ library
     Terminal.Posix.TIOCGWINSZ
     Terminal.Posix.TIOCSWINSZ
     Terminal.Posix.Winsize
-  build-depends:
-    array,
-    base          >= 4 && < 5,
-    containers,
-    diffarray,
-    mtl,
-    parsec,
-    process,
-    terminfo,
-    unix
-  default-language: Haskell2010
-  ghc-options:      -O
-
-executable hsterm
-  main-is:          Hsterm/Main.hs
-  hs-source-dirs:   src
-  other-modules:
-    Hsterm.Config
-    Hsterm.Device
-    Hsterm.Hsterm
-    Hsterm.LoadShaders
-    Hsterm.Renderer
-    Hsterm.State
-    Hsterm.Theme
-    Hsterm.Renderer.Background
-    Hsterm.Renderer.CursorRenderer
-    Hsterm.Renderer.DefaultRenderer
-    Hsterm.Renderer.FlatColor
-    Hsterm.Renderer.Utils
-  build-depends:
-    Terminal,
-    array,
-    base          >= 4 && < 5,
-    bytestring,
-    colour,
-    concurrent-extra,
-    containers,
-    diffarray,
-    FTGL,
-    GLUT,
-    GLURaw,
-    mtl,
-    OpenGL,
-    OpenGLRaw,
-    parsec,
-    process,
-    random,
-    stm,
-    terminfo,
-    text,
-    time,
-    unbounded-delays,
-    unix
-  default-language: Haskell2010
-  ghc-options:      -O
-
-executable hsterm-gpipe
-  main-is:          Hsterm/GPipe/EntryPoint.hs
-  hs-source-dirs:   src
-  other-modules:
+    Hsterm.GPipe.Config
+    Hsterm.GPipe.Dyre
     Hsterm.GPipe.Main
+    Hsterm.GPipe.Monad
     Hsterm.GPipe.Renderer
     Hsterm.GPipe.Terminal
   build-depends:
-    Terminal,
     array,
     base            >= 4.16 && < 5,
+    binary,
     bytestring,
     colour,
     containers,
     diffarray,
+    directory,
+    dyre            >= 0.9,
+    filepath,
     GPipe           >= 2.2,
     GPipe-GLFW      >= 1.4,
     gpipe-freetype,
@@ -107,6 +53,15 @@ executable hsterm-gpipe
     text,
     time,
     unix
+  default-language: GHC2021
+  ghc-options:      -O
+
+executable hsterm-gpipe
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:
+    Terminal,
+    base            >= 4.16 && < 5
   default-language: GHC2021
   ghc-options:      -O
 

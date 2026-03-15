@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 -- | VT100/ANSI ターミナルエミュレータのコアデータ型。
 --
 -- ターミナルの状態（画面バッファ、カーソル、色、属性）、
@@ -6,11 +7,13 @@ module Terminal.Types (
   module Terminal.Types,
   ) where
 import Data.Array
+import Data.Binary (Binary(..), putWord8, getWord8)
 import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Sequence (Seq)
 import Data.Tuple (swap)
 import Data.Word (Word8)
+import GHC.Generics (Generic)
 import qualified System.Console.Terminfo as TI
 
 -- | スクリーン上の座標。@(行, 列)@ で 1-indexed。
@@ -26,7 +29,7 @@ data TerminalChar = TerminalChar {
     isUnderlined :: Bool,           -- ^ 下線属性
     isBlinking :: Bool,             -- ^ 点滅属性
     isInverse :: Bool               -- ^ 反転属性
-} deriving (Show)
+} deriving (Show, Generic)
 
 -- | 'ScreenIndex' でインデックスされる配列。
 type TerminalArray = Array ScreenIndex
@@ -45,7 +48,7 @@ data AltScreenState = AltScreenState
   { asScreen       :: !TerminalScreen
   , asCursorPos    :: !ScreenIndex
   , asScrollRegion :: !(Int, Int)
-  }
+  } deriving (Generic)
 
 -- | ターミナル全体の状態。
 --
@@ -110,7 +113,7 @@ data TerminalAction =
      | SaveCursorPos                    -- ^ カーソル位置を保存 (DECSC / ESC 7)
      | RestoreCursorPos                 -- ^ カーソル位置を復元 (DECRC / ESC 8)
      | Ignored                          -- ^ 無視するシーケンス
-     deriving (Show, Eq)
+     deriving (Show, Eq, Generic)
 
 -- | ターミナルの色。
 --
@@ -127,7 +130,7 @@ data TerminalColor =
     | White
     | Color256 !Int             -- ^ 256色パレット (0-255)
     | ColorRGB !Word8 !Word8 !Word8  -- ^ TrueColor 24bit (R, G, B)
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
 
 instance Enum TerminalColor where
     fromEnum = fromJust . flip lookup tableTC
@@ -162,7 +165,7 @@ data AttributeMode =
      | Background TerminalColor           -- ^ 背景色の設定 (SGR 40-47)
      | ResetForeground                    -- ^ 前景色をデフォルトに戻す (SGR 39)
      | ResetBackground                    -- ^ 背景色をデフォルトに戻す (SGR 49)
-     deriving (Show, Eq)
+     deriving (Show, Eq, Generic)
 
 instance Enum AttributeMode where
     fromEnum = fromJust . flip lookup tableAM
@@ -194,10 +197,72 @@ data MouseMode
   | MouseNormal     -- ^ ボタン押下/離上のみ報告 (CSI ?1000h)
   | MouseButton     -- ^ ボタン押下中のドラッグも報告 (CSI ?1002h)
   | MouseAll        -- ^ 全モーション報告 (CSI ?1003h)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 -- | マウスイベントのエンコーディング方式。
 data MouseEncoding
   = MouseEncodingX10   -- ^ デフォルト X10 互換: ESC [ M Cb Cx Cy
   | MouseEncodingSGR   -- ^ SGR 拡張: ESC [ < Cb;Cx;Cy M/m (座標 > 223 対応)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+-- ── Binary インスタンス ──────────────────────────────────
+
+-- Generic から自動導出
+instance Binary TerminalChar
+instance Binary TerminalColor
+instance Binary MouseMode
+instance Binary MouseEncoding
+instance Binary AltScreenState
+
+-- | Terminal の Binary インスタンス。
+-- terminfo フィールドはシリアライズ不可（opaque ハンドル）なので除外する。
+-- デシリアライズ後は 'Nothing' になり、呼び出し側で再構築する必要がある。
+instance Binary Terminal where
+  put t = do
+    put (cursorPos t)
+    put (screen t)
+    put (inBuffer t)
+    put (responseBuffer t)
+    put (terminalTitle t)
+    put (scrollingRegion t)
+    put (rows t)
+    put (cols t)
+    put (currentForeground t)
+    put (currentBackground t)
+    -- terminfo は除外（opaque ハンドル）
+    put (optionShowCursor t)
+    put (optionBright t)
+    put (optionUnderlined t)
+    put (optionInverse t)
+    put (optionBlinking t)
+    put (mouseMode t)
+    put (mouseEncoding t)
+    put (pendingWrap t)
+    put (scrollbackBuffer t)
+    put (scrollbackMax t)
+    put (altScreen t)
+    put (savedCursor t)
+  get = Terminal
+    <$> get              -- cursorPos
+    <*> get              -- screen
+    <*> get              -- inBuffer
+    <*> get              -- responseBuffer
+    <*> get              -- terminalTitle
+    <*> get              -- scrollingRegion
+    <*> get              -- rows
+    <*> get              -- cols
+    <*> get              -- currentForeground
+    <*> get              -- currentBackground
+    <*> pure Nothing     -- terminfo（デシリアライズ後に再構築）
+    <*> get              -- optionShowCursor
+    <*> get              -- optionBright
+    <*> get              -- optionUnderlined
+    <*> get              -- optionInverse
+    <*> get              -- optionBlinking
+    <*> get              -- mouseMode
+    <*> get              -- mouseEncoding
+    <*> get              -- pendingWrap
+    <*> get              -- scrollbackBuffer
+    <*> get              -- scrollbackMax
+    <*> get              -- altScreen
+    <*> get              -- savedCursor

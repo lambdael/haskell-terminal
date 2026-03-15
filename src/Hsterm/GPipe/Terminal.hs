@@ -49,13 +49,17 @@ data PtyHandle = PtyHandle
 
 -- | シェルプロセスを PTY 上で起動する。
 --
+-- @mShell@ が @Just path@ の場合はそのパスのシェルを起動する。
+-- @Nothing@ の場合は @$SHELL@ 環境変数を使用し、未設定なら @\"bash\"@ にフォールバックする。
 -- forkProcess を使い、子プロセスで setsid + TIOCSCTTY を呼ぶことで
 -- スレーブ PTY を制御端末として設定する。
 -- これにより PTY の line discipline が \x03 を SIGINT に変換できる。
-spawnShell :: IO PtyHandle
-spawnShell = do
+spawnShell :: Maybe FilePath -> IO PtyHandle
+spawnShell mShell = do
   rawenv <- getEnvironment
-  let shell = fromMaybe "bash" $ lookup "SHELL" rawenv
+  let shell = case mShell of
+        Just s  -> s
+        Nothing -> fromMaybe "bash" $ lookup "SHELL" rawenv
       environment = [("TERM", "xterm")]
       env' = override rawenv environment
 

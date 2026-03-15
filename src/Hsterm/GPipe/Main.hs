@@ -3,7 +3,6 @@
 --
 -- GPipe + GPipe-GLFW + gpipe-freetype を使用して
 -- ターミナル画面をレンダリングする。
--- GLUT/OpenGL/FTGL への依存を完全に排除した新しい実装。
 module Hsterm.GPipe.Main (runGPipeTerminal) where
 
 import Control.Concurrent (forkIO, threadDelay)
@@ -13,10 +12,9 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Array ((!))
 import Data.Char (chr, ord)
 import Data.IORef
-import Data.List (dropWhileEnd)
 import Data.Maybe (fromJust, fromMaybe, isJust)
+import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
-import System.Exit (exitSuccess)
 import System.IO
 import qualified System.Process (readProcess)
 
@@ -30,12 +28,12 @@ import Graphics.GPipe.Context.GLFW (Key(..), KeyState(..), ModifierKeys(..),
 
 import Graphics.GPipe.Font
 import Graphics.GPipe.Font.Types (GlyphMetrics(..), GlyphRegion(..))
-import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 
+import System.Posix.IO (fdToHandle)
 import System.Posix.IOCtl (ioctl)
 import System.Posix.Signals (signalProcess, sigINT, sigTERM, installHandler, Handler(..))
-import System.Posix.Types (CPid)
+import System.Posix.Types (CPid, Fd)
 import Foreign.C.Types (CUShort)
 
 import qualified System.Console.Terminfo as TI
@@ -46,103 +44,14 @@ import Terminal.Types
 import Terminal.Posix.TIOCSWINSZ (TIOCSWINSZ(..))
 import Terminal.Posix.Winsize (Winsize(..))
 
+import Hsterm.GPipe.Config
+import Hsterm.GPipe.Dyre (restoreResumeState, ResumeState(..), requestReload)
+import Hsterm.GPipe.Monad
 import Hsterm.GPipe.Terminal
 import Hsterm.GPipe.Renderer
 
--- ── 選択状態 ──────────────────────────────────────────────
-
--- | マウスによるテキスト選択の状態。
--- セル座標は 1-indexed の @(行, 列)@。
-data Selection = Selection
-  { selAnchor :: !(Int, Int)  -- ^ ドラッグ開始位置
-  , selCurrent :: !(Int, Int) -- ^ 現在のドラッグ位置
-  } deriving (Show, Eq)
-
--- | 選択範囲を正規化して @(開始, 終了)@ を返す（開始 <= 終了）。
-selectionRange :: Selection -> ((Int, Int), (Int, Int))
-selectionRange (Selection a b)
-  | a <= b    = (a, b)
-  | otherwise = (b, a)
-
--- | ターミナル状態から選択範囲のテキストを抽出する。
--- スクロールバック表示中はスクロールオフセットを考慮する。
-extractSelectedText :: Terminal -> Int -> Selection -> String
-extractSelectedText term scrollOffset sel =
-  let ((r1, c1), (r2, c2)) = selectionRange sel
-      r = rows term
-      c = cols term
-      sbuf = scrollbackBuffer term
-      sbLen = Seq.length sbuf
-      lookupChar (y, x) =
-        if scrollOffset <= 0
-          then character (screen term ! (y, x))
-          else let vIdx = sbLen - scrollOffset + (y - 1)
-               in if vIdx < 0 then ' '
-                  else if vIdx < sbLen
-                       then let line = Seq.index sbuf vIdx
-                            in if x >= 1 && x <= length line
-                               then character (line !! (x - 1))
-                               else ' '
-                       else let screenRow = vIdx - sbLen + 1
-                            in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c
-                               then character (screen term ! (screenRow, x))
-                               else ' '
-      trimEnd = dropWhileEnd (== ' ')
-  in if r1 == r2
-     -- 1行選択
-     then trimEnd [lookupChar (r1, cx) | cx <- [c1..c2]]
-     -- 複数行選択
-     else let firstLine = trimEnd [lookupChar (r1, cx) | cx <- [c1..c]]
-              midLines  = [trimEnd [lookupChar (ry, cx) | cx <- [1..c]] | ry <- [r1+1..r2-1]]
-              lastLine  = trimEnd [lookupChar (r2, cx) | cx <- [1..c2]]
-          in unlines (firstLine : midLines) ++ lastLine
-
 -- ── 設定 ──────────────────────────────────────────────────
-
--- | GPipe ターミナルの設定。
-data GPipeTermConfig = GPipeTermConfig
-  { gpFontPath  :: !FilePath
-  , gpFontSize  :: !Int
-  , gpColorMap  :: TerminalColor -> Colour Double
-  , gpColorMapBright :: TerminalColor -> Colour Double
-  , gpDefaultFg :: !TerminalColor
-  , gpDefaultBg :: !TerminalColor
-  , gpCursorColor :: !(V4 Float)
-  }
-
--- | デフォルトの設定。
-defaultGPipeConfig :: GPipeTermConfig
-defaultGPipeConfig = GPipeTermConfig
-  { gpFontPath  = ""
-  , gpFontSize  = 24
-  , gpColorMap  = defaultColor
-  , gpColorMapBright = defaultColor
-  , gpDefaultFg = White
-  , gpDefaultBg = Black
-  , gpCursorColor = V4 1.0 0.2 0.9 0.8
-  }
-
-defaultColor :: TerminalColor -> Colour Double
-defaultColor Black   = sRGB24read "#330000"
-defaultColor Red     = sRGB24read "#ff6565"
-defaultColor Green   = sRGB24read "#56a700"
-defaultColor Yellow  = sRGB24read "#eab93d"
-defaultColor Blue    = sRGB24read "#204a87"
-defaultColor Magenta = sRGB24read "#c4a000"
-defaultColor Cyan    = sRGB24read "#89b6e2"
-defaultColor White   = sRGB24read "#cccccc"
-defaultColor _       = sRGB24read "#cccccc"
-
-defaultColorBright :: TerminalColor -> Colour Double
-defaultColorBright Black   = sRGB24read "#555753"
-defaultColorBright Red     = sRGB24read "#ff8d8d"
-defaultColorBright Green   = sRGB24read "#c8e7a8"
-defaultColorBright Yellow  = sRGB24read "#ffc123"
-defaultColorBright Blue    = sRGB24read "#3465a4"
-defaultColorBright Magenta = sRGB24read "#f57900"
-defaultColorBright Cyan    = sRGB24read "#46a4ff"
-defaultColorBright White   = sRGB24read "#ffffff"
-defaultColorBright _       = sRGB24read "#ffffff"
+-- GPipeTermConfig は Hsterm.GPipe.Config.TerminalConfig に移行済み。
 
 -- | TerminalColor を V4 Float に変換する。
 --
@@ -186,25 +95,29 @@ color256ToV4 normalMap brightMap n
 -- ── エントリーポイント ────────────────────────────────────
 
 -- | fontconfig でモノスペースフォントを探す。
-findMonospaceFont :: IO FilePath
-findMonospaceFont = do
-  result <- try $ System.Process.readProcess "fc-match" ["-f", "%{file}", "monospace:style=Regular"] ""
+findMonospaceFont :: String -> IO FilePath
+findMonospaceFont pattern_ = do
+  let query = if null pattern_ then "monospace:style=Regular" else pattern_
+  result <- try $ System.Process.readProcess "fc-match" ["-f", "%{file}", query] ""
   case (result :: Either SomeException String) of
     Right path -> return $ head $ lines path
-    Left _     -> error "fc-match failed: no monospace font found"
+    Left _     -> error $ "fc-match failed: no font found for pattern: " ++ query
 
 -- | GPipe ターミナルを起動する。
-runGPipeTerminal :: IO ()
-runGPipeTerminal = do
-  fontPath <- findMonospaceFont
+--
+-- デフォルト設定で起動する場合は @runGPipeTerminal defaultConfig@ を呼ぶ。
+-- Dyre リロードからの復帰時はターミナル状態と PTY を復元する。
+runGPipeTerminal :: TerminalConfig -> IO ()
+runGPipeTerminal cfg = do
+  -- Dyre コンパイルエラーの表示
+  case tcErrorMsg cfg of
+    Just err -> hPutStrLn stderr $ "Configuration error:\n" ++ err
+    Nothing  -> return ()
+
+  fontPath <- findMonospaceFont (tcFontFamily cfg)
   putStrLn $ "Using font: " ++ fontPath
 
-  let cfg = defaultGPipeConfig
-        { gpFontPath = fontPath
-        , gpColorMap = defaultColor
-        , gpColorMapBright = defaultColorBright
-        }
-      pixelSize = gpFontSize cfg
+  let pixelSize = tcFontSize cfg
 
   -- フォントアトラスを構築
   -- ターミナルで使用される文字セット: ASCII + ボックス描画 + ブロック要素 等
@@ -222,21 +135,43 @@ runGPipeTerminal = do
   let cellW = cellWidth atlas
       cellH = fromIntegral (faLineH atlas) :: Float
 
-  -- 初期ウィンドウサイズ（80x24ターミナル）
-  let initCols = 80
-      initRows = 24
-      winW = ceiling (cellW * fromIntegral initCols) :: Int
-      winH = ceiling (cellH * fromIntegral initRows) :: Int
+  -- Dyre リロードからの復帰チェック
+  mResume <- restoreResumeState
 
-  -- PTY を起動
-  pty <- spawnShell
-  putStrLn $ "Shell started, PID: " ++ show (ptyPid pty)
+  -- PTY ハンドルとターミナル状態の取得（復帰 or 新規起動）
+  (pty, termRef, initialScrollOffset) <- case mResume of
+    Just rs -> do
+      -- 復帰: 保存された fd から PTY ハンドルを再構築
+      putStrLn "Resuming from saved state..."
+      let fd  = fromIntegral (rsPtyFdNum rs)  :: Fd
+          pid = fromIntegral (rsPtyPidNum rs) :: CPid
+      master <- fdToHandle fd
+      hSetBuffering master NoBuffering
+      let pty = PtyHandle { ptyMaster = master, ptyPid = pid, ptyFd = fd }
+      -- ターミナル状態を復元（terminfo ハンドルは再構築）
+      termInfo <- TI.setupTermFromEnv
+      let term = (rsTerm rs) { terminfo = Just termInfo }
+      termRef <- newIORef term
+      return (pty, termRef, rsScrollOffset rs)
 
-  -- ターミナル状態
-  termInfo <- TI.setupTermFromEnv
-  termRef <- newIORef $ newTerminal (initRows, initCols) (Just termInfo)
+    Nothing -> do
+      -- 新規起動
+      pty <- spawnShell (tcShell cfg)
+      putStrLn $ "Shell started, PID: " ++ show (ptyPid pty)
+      termInfo <- TI.setupTermFromEnv
+      termRef <- newIORef $ (newTerminal (tcInitialRows cfg, tcInitialCols cfg) (Just termInfo))
+        { scrollbackMax = tcScrollback cfg }
+      return (pty, termRef, 0)
+
+  -- 復帰時はターミナルの寸法を使い、新規時は設定値を使う
+  let (effRows, effCols) = case mResume of
+        Just rs -> (rows (rsTerm rs), cols (rsTerm rs))
+        Nothing -> (tcInitialRows cfg, tcInitialCols cfg)
+      winW = ceiling (cellW * fromIntegral effCols) :: Int
+      winH = ceiling (cellH * fromIntegral effRows) :: Int
+
   dirty   <- newIORef True
-  scrollOffsetRef <- newIORef (0 :: Int)
+  scrollOffsetRef <- newIORef initialScrollOffset
 
   -- 選択状態
   selectionRef <- newIORef (Nothing :: Maybe Selection)
@@ -257,11 +192,28 @@ runGPipeTerminal = do
     fontTex <- uploadAtlasTexture atlas
 
     -- PTY にバイト列を送る共通ヘルパー
-    let sendPty :: String -> IO ()
-        sendPty s = do
+    let sendPtyIO :: String -> IO ()
+        sendPtyIO s = do
           hPutStr stderr $ "sendPty: " ++ show (map ord s) ++ "\n"
           hPutStr (ptyMaster pty) s
           hFlush (ptyMaster pty)
+
+    -- HstermM アクション実行用の環境
+    let hstermEnv = HstermEnv
+          { heTermRef         = termRef
+          , hePtyMaster       = ptyMaster pty
+          , hePtyFd           = ptyFd pty
+          , hePtyPid          = ptyPid pty
+          , heDirty           = dirty
+          , heScrollOffsetRef = scrollOffsetRef
+          , heSelectionRef    = selectionRef
+          , heClipboardWrite  = clipboardWriteRef
+          , hePasteRequest    = pasteRequestRef
+          }
+        runAction = runHstermM hstermEnv
+        -- キーバインドにリロードアクションを追加
+        bindings = Map.insert (KeyCombo True True False Key'R) requestReload
+                 $ tcKeyBindings cfg
 
     -- Ctrl が押されているかを追跡する（charCallback で制御文字を二重送信しないため）
     ctrlHeld <- liftIO $ newIORef False
@@ -274,7 +226,7 @@ runGPipeTerminal = do
       isCtrl <- readIORef ctrlHeld
       unless isCtrl $ do
         writeIORef scrollOffsetRef 0
-        sendPty [ch]
+        sendPtyIO [ch]
 
     -- キー入力コールバック（制御キー用）
     _ <- GLFW.setKeyCallback win $ Just $ \key _scancode keyState mods -> do
@@ -283,73 +235,42 @@ runGPipeTerminal = do
       liftIO $ writeIORef ctrlHeld ctrl
       when (keyState == KeyState'Pressed || keyState == KeyState'Repeating) $ do
         let shift = modifierKeysShift mods
-            isScrollKey = shift && key `elem` [Key'PageUp, Key'PageDown, Key'Home, Key'End]
-            isClipboardKey = ctrl && shift && key `elem` [Key'C, Key'V]
-        -- Ctrl+Shift+C: 選択テキストをクリップボードにコピー
-        when (ctrl && shift && key == Key'C) $ do
-          sel <- readIORef selectionRef
-          case sel of
-            Just s -> do
-              term <- readIORef termRef
-              scrollOff <- readIORef scrollOffsetRef
-              let txt = extractSelectedText term scrollOff s
-              unless (null txt) $ writeIORef clipboardWriteRef (Just txt)
-            Nothing -> return ()
-        -- Ctrl+Shift+V: クリップボードからペースト
-        when (ctrl && shift && key == Key'V) $ do
-          writeIORef pasteRequestRef True
-        -- スクロールバック操作（Shift+PageUp/Down/Home/End）
-        when (shift && key == Key'PageUp) $ do
-          term <- readIORef termRef
-          let maxOff = Seq.length (scrollbackBuffer term)
-              pageSize = max 1 (rows term - 1)
-          modifyIORef' scrollOffsetRef (\off -> min maxOff (off + pageSize))
-          writeIORef dirty True
-        when (shift && key == Key'PageDown) $ do
-          term <- readIORef termRef
-          let pageSize = max 1 (rows term - 1)
-          modifyIORef' scrollOffsetRef (\off -> max 0 (off - pageSize))
-          writeIORef dirty True
-        when (shift && key == Key'Home) $ do
-          term <- readIORef termRef
-          writeIORef scrollOffsetRef (Seq.length (scrollbackBuffer term))
-          writeIORef dirty True
-        when (shift && key == Key'End) $ do
-          writeIORef scrollOffsetRef 0
-          writeIORef dirty True
-        -- 通常キー入力時はスクロール位置をリセット
-        when (not isScrollKey && not isClipboardKey) $ writeIORef scrollOffsetRef 0
-        when (not isScrollKey && not isClipboardKey) $ case key of
-          -- Ctrl+Q で強制終了
-          Key'Q | ctrl -> do
-            signalProcess sigINT (ptyPid pty)
-            exitSuccess
+            alt   = modifierKeysAlt mods
+            combo = KeyCombo ctrl shift alt key
 
-          -- Ctrl+文字 → 制御コード (Ctrl-A=0x01 ... Ctrl-Z=0x1A)
-          _ | ctrl, Just c <- keyToAlpha key -> do
-            sendPty [chr (ord c - ord 'a' + 1)]
+        -- カスタムキーバインドを検索
+        case Map.lookup combo bindings of
+          Just action -> runAction action
+          Nothing -> do
+            -- カスタムバインドがない場合のデフォルトターミナル入力処理
+            -- 通常キー入力時はスクロール位置をリセット
+            writeIORef scrollOffsetRef 0
+            case key of
+              -- Ctrl+文字 → 制御コード (Ctrl-A=0x01 ... Ctrl-Z=0x1A)
+              _ | ctrl, Just c <- keyToAlpha key ->
+                sendPtyIO [chr (ord c - ord 'a' + 1)]
 
-          -- Enter → CR
-          Key'Enter     -> sendPty "\r"
-          -- Backspace → DEL (0x7F)
-          Key'Backspace -> sendPty "\x7f"
-          -- Tab → HT
-          Key'Tab       -> sendPty "\t"
-          -- Escape → ESC
-          Key'Escape    -> sendPty "\x1b"
+              -- Enter → CR
+              Key'Enter     -> sendPtyIO "\r"
+              -- Backspace → DEL (0x7F)
+              Key'Backspace -> sendPtyIO "\x7f"
+              -- Tab → HT
+              Key'Tab       -> sendPtyIO "\t"
+              -- Escape → ESC
+              Key'Escape    -> sendPtyIO "\x1b"
 
-          -- 特殊キー → terminfo エスケープシーケンス
-          _ -> do
-            term <- readIORef termRef
-            case terminfo term of
-              Just tiHandle ->
-                case lookup key terminalKeyMap of
-                  Just cap ->
-                    case TI.getCapability tiHandle cap of
-                      Just str -> sendPty str
-                      Nothing  -> return ()
+              -- 特殊キー → terminfo エスケープシーケンス
+              _ -> do
+                term <- readIORef termRef
+                case terminfo term of
+                  Just tiHandle ->
+                    case lookup key terminalKeyMap of
+                      Just cap ->
+                        case TI.getCapability tiHandle cap of
+                          Just str -> sendPtyIO str
+                          Nothing  -> return ()
+                      Nothing -> return ()
                   Nothing -> return ()
-              Nothing -> return ()
 
     -- ウィンドウサイズ変更コールバック
     winSizeRef <- liftIO $ newIORef (V2 winW winH)
@@ -374,7 +295,7 @@ runGPipeTerminal = do
             when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
               let enc = mouseEncoding term
                   cb = if isDragging then 32 else 35 + 32
-              sendPty $ encodeMouseEvent enc cb col row True
+              sendPtyIO $ encodeMouseEvent enc cb col row True
         else
           -- マウスモード無効時: ドラッグ中なら選択範囲を更新
           when isDragging $ do
@@ -401,7 +322,7 @@ runGPipeTerminal = do
                         MouseButton'3 -> 2  -- right
                         _             -> 0
             writeIORef mouseBtnRef isPress
-            sendPty $ encodeMouseEvent enc btn col row isPress
+            sendPtyIO $ encodeMouseEvent enc btn col row isPress
         else
           -- マウスモード無効時: 左ボタンでテキスト選択
           when (button == MouseButton'1) $ do
@@ -427,7 +348,7 @@ runGPipeTerminal = do
           when (col >= 1 && row >= 1 && col <= cols term && row <= rows term) $ do
             let enc = mouseEncoding term
                 btn = if dy > 0 then 64 else 65  -- scroll up / down
-            sendPty $ encodeMouseEvent enc btn col row True
+            sendPtyIO $ encodeMouseEvent enc btn col row True
         else do
           -- マウスモード無効時: スクロールバック操作
           let maxOff = Seq.length (scrollbackBuffer term)
@@ -453,7 +374,7 @@ runGPipeTerminal = do
         signalProcess 28 (ptyPid pty)  -- SIGWINCH
 
     -- メインループ
-    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty (ptyPid pty)
+    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPtyIO (ptyPid pty)
 
 -- | メインループ。
 --
@@ -473,7 +394,7 @@ mainLoop
   :: Window os RGBAFloat ()
   -> Texture2D os (Format RFloat)
   -> FontAtlas
-  -> GPipeTermConfig
+  -> TerminalConfig
   -> IORef Terminal
   -> IORef Bool
   -> IORef (V2 Int)
@@ -494,7 +415,7 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
   curShader  <- compileCursorShader win winSize
 
   -- 背景色の RGB
-  let RGB bgR bgG bgB = toSRGB (gpColorMap cfg Black)
+  let RGB bgR bgG bgB = toSRGB (tcColorMap cfg (tcDefaultBg cfg))
       clearCol = V4 (realToFrac bgR) (realToFrac bgG) (realToFrac bgB) (1.0 :: Float)
 
   -- 初期ターミナルサイズから固定グリッドバッファ確保
@@ -532,14 +453,14 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
      bgGridRef txtGridRef curBufRef curLenRef prevDimRef
      bgTexRef fgTexRef uvTexRef posTexRef
   where
-    colorFn = colourToV4 False (gpColorMap cfg) (gpColorMapBright cfg)
+    colorFn = colourToV4 False (tcColorMap cfg) (tcColorMapBright cfg)
     nearestFilter = SamplerFilter Nearest Nearest Nearest Nothing
 
     go textShader bgShader curShader prevSize clearCol
        bgGridRef txtGridRef curBufRef curLenRef prevDimRef
        bgTexRef fgTexRef uvTexRef posTexRef = do
-      -- フレームレート制限 ≒ 60fps
-      liftIO $ threadDelay 16000
+      -- フレームレート制限
+      liftIO $ threadDelay (tcFrameDelay cfg)
 
       -- クリップボード操作（ContextT 内で実行する必要があるため、ここで処理）
       -- コピー: clipboardWriteRef に text があればクリップボードに書き込む
@@ -626,7 +547,7 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
         -- カーソル頂点を更新（スクロールバック表示中はカーソル非表示）
         let cursorVerts = if scrollOff > 0
                           then []
-                          else buildCursorVertices atlas term (gpCursorColor cfg)
+                          else buildCursorVertices atlas term (tcCursorColor cfg)
             curLen = length cursorVerts
         liftIO $ writeIORef curLenRef curLen
         when (curLen > 0) $ do
@@ -700,7 +621,7 @@ keyToAlpha Key'M = Just 'm'
 keyToAlpha Key'N = Just 'n'
 keyToAlpha Key'O = Just 'o'
 keyToAlpha Key'P = Just 'p'
-keyToAlpha Key'Q = Just 'q'   -- Ctrl+Q は上で exitSuccess に使っている
+keyToAlpha Key'Q = Just 'q'
 keyToAlpha Key'R = Just 'r'
 keyToAlpha Key'S = Just 's'
 keyToAlpha Key'T = Just 't'
