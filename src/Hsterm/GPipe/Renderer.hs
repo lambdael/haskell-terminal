@@ -5,6 +5,9 @@
 -- 各セルの文字・色情報は4枚のテクスチャに格納し、毎フレーム更新する。
 -- シェーダーがテクスチャルックアップでグリフ位置・UV・色を取得するため、
 -- 頂点データは画面内容に依存しない。
+--
+-- ユーザは 'ShaderConfig' でレイヤーシェーダを、
+-- 'ColorScheme' で色スロット単位のシェーダをカスタマイズできる。
 module Hsterm.GPipe.Renderer
   ( -- * シェーダー環境
     TextShaderEnv(..)
@@ -25,6 +28,8 @@ module Hsterm.GPipe.Renderer
   , cellWidth
   ) where
 
+import Prelude hiding ((<*))
+
 import Data.Array (indices, (!), bounds)
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -35,51 +40,55 @@ import Linear (V2(..), V4(..))
 import Graphics.GPipe.Font.Types (FontAtlas(..), GlyphRegion(..), GlyphMetrics(..))
 
 import Terminal.Types
+import Hsterm.GPipe.Shader
 
 -- ── シェーダー環境 ────────────────────────────────────────
 
 -- | テキスト描画用シェーダー環境（セルデータテクスチャ方式）。
---
--- 頂点: @(cellTopLeft, cellTexCoord, cornerLerp)@
--- 頂点シェーダーで glyphPos/glyphUV テクスチャからグリフ情報を取得し、
--- cornerLerp で頂点位置とアトラス UV を計算する。
 data TextShaderEnv os = TextShaderEnv
   { tePrimitives  :: PrimitiveArray Triangles (B2 Float, B2 Float, B2 Float)
   , teFontAtlas   :: (Texture2D os (Format RFloat), SamplerFilter RFloat, (EdgeMode2, BorderColor RFloat))
   , teFgColorTex  :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
   , teGlyphUVTex  :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
   , teGlyphPosTex :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
+  , teTimeBuf     :: (Buffer os (Uniform (B Float)), Int)
+  , teMouseBuf    :: (Buffer os (Uniform (B2 Float)), Int)
   }
 
 -- | 背景色描画用シェーダー環境（セルデータテクスチャ方式）。
---
--- 頂点: @(position, cellTexCoord)@
--- フラグメントシェーダーで bgColorTex からセルの背景色を取得する。
 data BgShaderEnv os = BgShaderEnv
   { bgPrimitives :: PrimitiveArray Triangles (B2 Float, B2 Float)
   , bgColorTex   :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
+  , bgTimeBuf    :: (Buffer os (Uniform (B Float)), Int)
+  , bgMouseBuf   :: (Buffer os (Uniform (B2 Float)), Int)
   }
 
--- | カーソル描画用シェーダー環境（テクスチャなし、従来方式）。
+-- | カーソル描画用シェーダー環境。
 data CursorShaderEnv os = CursorShaderEnv
-  { curPrimitives :: PrimitiveArray Triangles (B2 Float, B4 Float)
+  { curPrimitives :: PrimitiveArray Triangles (B2 Float, B4 Float, B2 Float)
+  , curTimeBuf    :: (Buffer os (Uniform (B Float)), Int)
+  , curMouseBuf   :: (Buffer os (Uniform (B2 Float)), Int)
   }
 
 -- ── シェーダーコンパイル ──────────────────────────────────
 
 -- | テキスト描画シェーダー。
---
--- 頂点シェーダー: セルデータテクスチャから glyphPos / glyphUV を読み、
--- cornerLerp で頂点位置とアトラス UV を計算する。
--- フラグメントシェーダー: fgColor テクスチャから前景色、フォントアトラスから
--- アルファ値を取得する。
 compileTextShader
   :: (ContextHandler ctx)
   => Window os RGBAFloat ()
-  -> V2 Int
+  -> V2 Int             -- ^ ウィンドウサイズ
+  -> ShaderConfig       -- ^ ユーザシェーダ設定
+  -> ColorScheme        -- ^ カラースキーム（ColorShader ディスパッチ用）
+  -> Float              -- ^ cellWidth
+  -> Float              -- ^ cellHeight
+  -> Int                -- ^ cols
+  -> Int                -- ^ rows
   -> ContextT ctx os IO (CompiledShader os (TextShaderEnv os))
-compileTextShader win winSize =
+compileTextShader win winSize shaderCfg colorScheme cellW cellH numCols numRows =
   compileShader $ do
+    time  <- getUniform teTimeBuf
+    mouse <- getUniform teMouseBuf
+
     fontSamp <- newSampler2D (\s -> teFontAtlas s)
     fgSamp   <- newSampler2D (\s -> teFgColorTex s)
     uvSamp   <- newSampler2D (\s -> teGlyphUVTex s)
@@ -89,25 +98,17 @@ compileTextShader win winSize =
 
     let V2 sw sh = fmap fromIntegral winSize :: V2 VFloat
         projected = fmap (\(cellTL, cellUV, corner) ->
-          -- セルデータテクスチャからグリフ情報を取得（頂点シェーダー内）
           let V4 ox oy gw gh = sample2D posSamp (SampleLod 0) Nothing Nothing cellUV
               V4 u0 v0 u1 v1 = sample2D uvSamp  (SampleLod 0) Nothing Nothing cellUV
-
               V2 lx ly = corner
-
-              -- グリフ矩形内の実際の頂点位置
               V2 tlx tly = cellTL
               px = tlx + ox + lx * gw
               py = tly + oy + ly * gh
-
-              -- アトラス UV
               u = u0 + lx * (u1 - u0)
               v = v0 + ly * (v1 - v0)
-
-              -- クリップ空間へ
               cx = px * 2 / sw - 1
               cy = 1 - py * 2 / sh
-          in  (V4 cx cy 0 1, (V2 u v, cellUV))
+          in  (V4 cx cy 0 1, (V2 u v, cellUV, V2 px py))
           ) prims
 
     frags <- rasterize
@@ -117,10 +118,27 @@ compileTextShader win winSize =
              ))
       projected
 
-    let colored = fmap (\(uv, cellUV) ->
-          let a = sample2D fontSamp SampleAuto Nothing Nothing uv
-              V4 cr cg cb _ = sample2D fgSamp SampleAuto Nothing Nothing cellUV
-          in  V4 cr cg cb a
+    let colorShaderSlots = collectColorShaderSlots colorScheme
+        globals = ShaderGlobals
+          { sgTime       = time
+          , sgResolution = fmap fromIntegral winSize
+          , sgMouse      = mouse
+          , sgGridSize   = V2 (fromIntegral numCols) (fromIntegral numRows)
+          , sgCellSize   = V2 (realToFrac cellW) (realToFrac cellH)
+          }
+        colored = fmap (\(uv, cellUV, pixelPos) ->
+          let glyphAlpha = sample2D fontSamp SampleAuto Nothing Nothing uv
+              rawFg = sample2D fgSamp SampleAuto Nothing Nothing cellUV
+              V4 _fr _fg _fb fa = rawFg
+              -- ColorShader ディスパッチ: alpha < 0 ならスロットインデックス
+              V2 cw ch = sgCellSize globals
+              V2 px py = pixelPos
+              cellPos = V2 (floor' (px / cw)) (floor' (py / ch))
+              cellUV' = V2 (fract' (px / cw)) (fract' (py / ch))
+              fgColor = ifThenElse' (fa >=* 0)
+                rawFg
+                (buildColorShaderDispatch colorShaderSlots globals cellPos cellUV' _fr)
+          in  scTextShader shaderCfg globals pixelPos cellPos fgColor glyphAlpha
           ) frags
 
     drawWindowColor
@@ -131,15 +149,22 @@ compileTextShader win winSize =
       colored
 
 -- | 背景色描画シェーダー。
---
--- フラグメントシェーダーで bgColorTex からセルの背景色を取得する。
 compileBgShader
   :: (ContextHandler ctx)
   => Window os RGBAFloat ()
-  -> V2 Int
+  -> V2 Int             -- ^ ウィンドウサイズ
+  -> ShaderConfig       -- ^ ユーザシェーダ設定
+  -> ColorScheme        -- ^ カラースキーム
+  -> Float              -- ^ cellWidth
+  -> Float              -- ^ cellHeight
+  -> Int                -- ^ cols
+  -> Int                -- ^ rows
   -> ContextT ctx os IO (CompiledShader os (BgShaderEnv os))
-compileBgShader win winSize =
+compileBgShader win winSize shaderCfg colorScheme cellW cellH numCols numRows =
   compileShader $ do
+    time  <- getUniform bgTimeBuf
+    mouse <- getUniform bgMouseBuf
+
     bgSamp <- newSampler2D (\s -> bgColorTex s)
     prims  <- toPrimitiveStream bgPrimitives
 
@@ -148,7 +173,7 @@ compileBgShader win winSize =
           let V2 px py = pos
               cx = px * 2 / sw - 1
               cy = 1 - py * 2 / sh
-          in  (V4 cx cy 0 1, cellUV)
+          in  (V4 cx cy 0 1, (cellUV, pos))
           ) prims
 
     frags <- rasterize
@@ -158,8 +183,25 @@ compileBgShader win winSize =
              ))
       projected
 
-    let colored = fmap (\cellUV ->
-          sample2D bgSamp SampleAuto Nothing Nothing cellUV
+    let colorShaderSlots = collectColorShaderSlots colorScheme
+        globals = ShaderGlobals
+          { sgTime       = time
+          , sgResolution = fmap fromIntegral winSize
+          , sgMouse      = mouse
+          , sgGridSize   = V2 (fromIntegral numCols) (fromIntegral numRows)
+          , sgCellSize   = V2 (realToFrac cellW) (realToFrac cellH)
+          }
+        colored = fmap (\(cellUV, pixelPos) ->
+          let rawColor = sample2D bgSamp SampleAuto Nothing Nothing cellUV
+              V4 _cr _cg _cb ca = rawColor
+              V2 cw ch = sgCellSize globals
+              V2 px py = pixelPos
+              cellPos = V2 (floor' (px / cw)) (floor' (py / ch))
+              cellUV' = V2 (fract' (px / cw)) (fract' (py / ch))
+              baseColor = ifThenElse' (ca >=* 0)
+                rawColor
+                (buildColorShaderDispatch colorShaderSlots globals cellPos cellUV' _cr)
+          in  scBgShader shaderCfg globals pixelPos cellPos cellUV' baseColor
           ) frags
 
     drawWindowColor
@@ -169,22 +211,30 @@ compileBgShader win winSize =
         (V4 0 0 0 0)) (pure True)))
       colored
 
--- | カーソル描画シェーダー（テクスチャなし、従来方式）。
+-- | カーソル描画シェーダー。
 compileCursorShader
   :: (ContextHandler ctx)
   => Window os RGBAFloat ()
-  -> V2 Int
+  -> V2 Int             -- ^ ウィンドウサイズ
+  -> ShaderConfig       -- ^ ユーザシェーダ設定
+  -> Float              -- ^ cellWidth
+  -> Float              -- ^ cellHeight
+  -> Int                -- ^ cols
+  -> Int                -- ^ rows
   -> ContextT ctx os IO (CompiledShader os (CursorShaderEnv os))
-compileCursorShader win winSize =
+compileCursorShader win winSize shaderCfg cellW cellH numCols numRows =
   compileShader $ do
+    time  <- getUniform curTimeBuf
+    mouse <- getUniform curMouseBuf
+
     prims <- toPrimitiveStream curPrimitives
 
     let V2 sw sh = fmap fromIntegral winSize :: V2 VFloat
-        projected = fmap (\(pos, col) ->
+        projected = fmap (\(pos, col, corner) ->
           let V2 px py = pos
               cx = px * 2 / sw - 1
               cy = 1 - py * 2 / sh
-          in  (V4 cx cy 0 1, col)
+          in  (V4 cx cy 0 1, (col, corner))
           ) prims
 
     frags <- rasterize
@@ -194,12 +244,23 @@ compileCursorShader win winSize =
              ))
       projected
 
+    let globals = ShaderGlobals
+          { sgTime       = time
+          , sgResolution = fmap fromIntegral winSize
+          , sgMouse      = mouse
+          , sgGridSize   = V2 (fromIntegral numCols) (fromIntegral numRows)
+          , sgCellSize   = V2 (realToFrac cellW) (realToFrac cellH)
+          }
+        colored = fmap (\(col, cellUV) ->
+          scCursorShader shaderCfg globals cellUV col
+          ) frags
+
     drawWindowColor
       (const (win, ContextColorOption (BlendRgbAlpha
         (FuncAdd, FuncAdd)
         (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero)
         (V4 0 0 0 0)) (pure True)))
-      (fmap (\col -> col) frags)
+      colored
 
 -- ── ユーティリティ ────────────────────────────────────────
 
@@ -360,12 +421,12 @@ buildCellData atlas term colorFn scrollOffset selection =
     unzip4 :: [(a,b,c,d)] -> ([a],[b],[c],[d])
     unzip4 = foldr (\(a,b,c,d) ~(as,bs,cs,ds) -> (a:as,b:bs,c:cs,d:ds)) ([],[],[],[])
 
--- | カーソル矩形の頂点（従来方式、テクスチャなし）。
+-- | カーソル矩形の頂点。
 buildCursorVertices
   :: FontAtlas
   -> Terminal
   -> V4 Float
-  -> [(V2 Float, V4 Float)]
+  -> [(V2 Float, V4 Float, V2 Float)]
 buildCursorVertices atlas term cursorCol =
   if not (optionShowCursor term)
     then []
@@ -377,6 +438,6 @@ buildCursorVertices atlas term cursorCol =
           y0 = fromIntegral (cy - 1) * fh
           x1 = x0 + cw
           y1 = y0 + fh
-      in [ (V2 x0 y0, cursorCol), (V2 x1 y0, cursorCol), (V2 x1 y1, cursorCol)
-         , (V2 x0 y0, cursorCol), (V2 x1 y1, cursorCol), (V2 x0 y1, cursorCol)
+      in [ (V2 x0 y0, cursorCol, V2 0 0), (V2 x1 y0, cursorCol, V2 1 0), (V2 x1 y1, cursorCol, V2 1 1)
+         , (V2 x0 y0, cursorCol, V2 0 0), (V2 x1 y1, cursorCol, V2 1 1), (V2 x0 y1, cursorCol, V2 0 1)
          ]

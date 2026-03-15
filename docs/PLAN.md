@@ -30,7 +30,7 @@ freetype2 バインディング + 手動テクスチャアトラス
 - [x] スクロールバック（代替画面バッファ）
 - [x] マウス 対応
 - [x] マウスによる選択・コピー（ctrl+shift+c）・ペースト（ctrl+shift+v）
-- [ ] Xmonad 風ホットリロード対応
+- [x] Xmonad 風ホットリロード対応
 
 ### Xmonad 風ホットリロード (Dyre)
 
@@ -232,10 +232,10 @@ Ctrl+Shift+R （キーバインドで発火）
 - [x] **Phase 2**: `Terminal` モナド導入。キーバインドをモナドアクションに移行
 - [x] **Phase 3**: `Terminal.Types.Terminal` を `Serializable` にする
 - [x] **Phase 4**: Dyre 統合 — `wrapMain` + リコンパイル + exec 置換
-- [ ] **Phase 5**: `ShaderConfig` でレイヤーシェーダカスタマイズ対応
-- [ ] **Phase 6**: `ColorScheme` に `ColorSlot` 導入 — 色スロットにシェーダを割当可能に
-- [ ] **Phase 7**: time uniform + アニメーション対応
-- [ ] **Phase 8**: サンプル `config.hs` を用意（アニメーションカラースキームのデモ含む）
+- [x] **Phase 5**: `ShaderConfig` でレイヤーシェーダカスタマイズ対応
+- [x] **Phase 6**: `ColorScheme` に `ColorSlot` 導入 — 色スロットにシェーダを割当可能に
+- [x] **Phase 7**: time uniform + アニメーション対応
+- [x] **Phase 8**: サンプル `config.hs` を用意（アニメーションカラースキームのデモ含む）
 
 #### 注意事項
 - Dyre が足りない場合（PTY fd 引き継ぎのカスタム exec 等）は自前実装にフォールバック

@@ -29,6 +29,7 @@ library
     Hsterm.GPipe.Main
     Hsterm.GPipe.Monad
     Hsterm.GPipe.Renderer
+    Hsterm.GPipe.Shader
     Hsterm.GPipe.Terminal
   build-depends:
     array,

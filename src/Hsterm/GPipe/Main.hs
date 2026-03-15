@@ -5,6 +5,8 @@
 -- ターミナル画面をレンダリングする。
 module Hsterm.GPipe.Main (runGPipeTerminal) where
 
+import Prelude hiding ((<*))
+
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (SomeException(..), try, catch)
 import Control.Monad (unless, when, void)
@@ -14,6 +16,7 @@ import Data.Char (chr, ord)
 import Data.IORef
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import qualified Data.Map.Strict as Map
+import Data.Time.Clock (UTCTime, getCurrentTime, diffUTCTime)
 import Data.Word (Word8)
 import System.IO
 import qualified System.Process (readProcess)
@@ -49,48 +52,6 @@ import Hsterm.GPipe.Dyre (restoreResumeState, ResumeState(..), requestReload)
 import Hsterm.GPipe.Monad
 import Hsterm.GPipe.Terminal
 import Hsterm.GPipe.Renderer
-
--- ── 設定 ──────────────────────────────────────────────────
--- GPipeTermConfig は Hsterm.GPipe.Config.TerminalConfig に移行済み。
-
--- | TerminalColor を V4 Float に変換する。
---
--- 基本8色は bright フラグに応じてパレットを切り替える。
--- Color256 / ColorRGB はパレットに依存せず直接変換する。
-colourToV4 :: Bool -> (TerminalColor -> Colour Double) -> (TerminalColor -> Colour Double) -> Bool -> TerminalColor -> V4 Float
-colourToV4 _ normalMap brightMap _bright (Color256 n) = color256ToV4 normalMap brightMap n
-colourToV4 _ _normalMap _brightMap _bright (ColorRGB r g b) =
-  V4 (fromIntegral r / 255.0) (fromIntegral g / 255.0) (fromIntegral b / 255.0) 1.0
-colourToV4 _ normalMap brightMap bright tc =
-  let cm = if bright then brightMap else normalMap
-      RGB r g b = toSRGB (cm tc)
-  in  V4 (realToFrac r) (realToFrac g) (realToFrac b) 1.0
-
--- | 256色パレットのインデックスを V4 Float に変換する。
---
--- * 0–7: 基本8色（normalMap）
--- * 8–15: 明るい色（brightMap）
--- * 16–231: 6×6×6 カラーキューブ
--- * 232–255: グレースケールランプ
-color256ToV4 :: (TerminalColor -> Colour Double) -> (TerminalColor -> Colour Double) -> Int -> V4 Float
-color256ToV4 normalMap brightMap n
-  | n < 0     = color256ToV4 normalMap brightMap 0
-  | n < 8     = let basic = [Black, Red, Green, Yellow, Blue, Magenta, Cyan, White] !! n
-                    RGB r g b = toSRGB (normalMap basic)
-                in  V4 (realToFrac r) (realToFrac g) (realToFrac b) 1.0
-  | n < 16    = let basic = [Black, Red, Green, Yellow, Blue, Magenta, Cyan, White] !! (n - 8)
-                    RGB r g b = toSRGB (brightMap basic)
-                in  V4 (realToFrac r) (realToFrac g) (realToFrac b) 1.0
-  | n < 232   = let idx = n - 16
-                    ri = idx `div` 36
-                    gi = (idx `mod` 36) `div` 6
-                    bi = idx `mod` 6
-                    toF i = if i == 0 then 0.0
-                            else fromIntegral (55 + 40 * i) / 255.0
-                in  V4 (toF ri) (toF gi) (toF bi) 1.0
-  | n < 256   = let g = fromIntegral (8 + 10 * (n - 232)) / 255.0 :: Float
-                in  V4 g g g 1.0
-  | otherwise = color256ToV4 normalMap brightMap 255
 
 -- ── エントリーポイント ────────────────────────────────────
 
@@ -374,7 +335,8 @@ runGPipeTerminal cfg = do
         signalProcess 28 (ptyPid pty)  -- SIGWINCH
 
     -- メインループ
-    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPtyIO (ptyPid pty)
+    startTime <- liftIO getCurrentTime
+    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPtyIO (ptyPid pty) mousePosRef startTime
 
 -- | メインループ。
 --
@@ -404,19 +366,18 @@ mainLoop
   -> IORef Bool            -- ^ pasteRequestRef
   -> (String -> IO ())     -- ^ sendPty
   -> CPid
+  -> IORef (Double, Double) -- ^ mousePosRef
+  -> UTCTime -- ^ startTime
   -> ContextT GLFW.Handle os IO ()
-mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty pid = do
+mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty pid mousePosRef startTime = do
   -- ウィンドウサイズを取得
   winSize <- liftIO $ readIORef winSizeRef
 
-  -- シェーダーをコンパイル（3種: 背景・テキスト・カーソル）
-  textShader <- compileTextShader win winSize
-  bgShader   <- compileBgShader win winSize
-  curShader  <- compileCursorShader win winSize
-
-  -- 背景色の RGB
-  let RGB bgR bgG bgB = toSRGB (tcColorMap cfg (tcDefaultBg cfg))
-      clearCol = V4 (realToFrac bgR) (realToFrac bgG) (realToFrac bgB) (1.0 :: Float)
+  let scheme    = tcColorScheme cfg
+      shaderCfg = tcShaderConfig cfg
+      cellW     = cellWidth atlas
+      cellH     = fromIntegral (faLineH atlas) :: Float
+      animated  = hasAnimatedSlots scheme
 
   -- 初期ターミナルサイズから固定グリッドバッファ確保
   term0 <- liftIO $ readIORef termRef
@@ -424,11 +385,20 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       c0 = cols term0
       gridCap = r0 * c0 * 6
 
+  -- シェーダーをコンパイル（3種: 背景・テキスト・カーソル）
+  textShader <- compileTextShader win winSize shaderCfg scheme cellW cellH c0 r0
+  bgShader   <- compileBgShader win winSize shaderCfg scheme cellW cellH c0 r0
+  curShader  <- compileCursorShader win winSize shaderCfg cellW cellH c0 r0
+
+  -- 背景クリア色（デフォルト背景スロットの静的色部分）
+  let clearCol = case csNormal scheme (tcDefaultBg cfg) of
+        SolidColor c -> c
+        _            -> V4 0 0 0 1
+
   bgGridBuf  <- newBuffer gridCap
   txtGridBuf <- newBuffer gridCap
-  curBuf     <- newBuffer (6 :: Int)  -- カーソルは最大6頂点
+  curBuf     <- newBuffer (6 :: Int)
 
-  -- リサイズ時のみ再生成する固定グリッド頂点を書き込む
   writeBuffer bgGridBuf 0 (buildBgGridVertices atlas r0 c0)
   writeBuffer txtGridBuf 0 (buildTextGridVertices atlas r0 c0)
 
@@ -437,6 +407,10 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
   fgColorTex'  <- newTexture2D RGBA32F (V2 c0 r0) 1
   glyphUVTex'  <- newTexture2D RGBA32F (V2 c0 r0) 1
   glyphPosTex' <- newTexture2D RGBA32F (V2 c0 r0) 1
+
+  -- time / mouse uniform バッファ
+  timeBuf  <- newBuffer 1 :: ContextT GLFW.Handle os IO (Buffer os (Uniform (B Float)))
+  mouseBuf <- newBuffer 1 :: ContextT GLFW.Handle os IO (Buffer os (Uniform (B2 Float)))
 
   bgGridRef  <- liftIO $ newIORef bgGridBuf
   txtGridRef <- liftIO $ newIORef txtGridBuf
@@ -452,25 +426,41 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
   go textShader bgShader curShader winSize clearCol
      bgGridRef txtGridRef curBufRef curLenRef prevDimRef
      bgTexRef fgTexRef uvTexRef posTexRef
+     timeBuf mouseBuf
   where
-    colorFn = colourToV4 False (tcColorMap cfg) (tcColorMapBright cfg)
+    scheme    = tcColorScheme cfg
+    shaderCfg = tcShaderConfig cfg
+    cellW     = cellWidth atlas
+    cellH     = fromIntegral (faLineH atlas) :: Float
+    animated  = hasAnimatedSlots scheme
     nearestFilter = SamplerFilter Nearest Nearest Nearest Nothing
 
     go textShader bgShader curShader prevSize clearCol
        bgGridRef txtGridRef curBufRef curLenRef prevDimRef
-       bgTexRef fgTexRef uvTexRef posTexRef = do
+       bgTexRef fgTexRef uvTexRef posTexRef
+       timeBuf mouseBuf = do
       -- フレームレート制限
       liftIO $ threadDelay (tcFrameDelay cfg)
 
+      -- 経過時間を計算
+      now <- liftIO getCurrentTime
+      let elapsed = realToFrac (diffUTCTime now startTime) :: Float
+
+      -- time / mouse uniform を更新
+      writeBuffer timeBuf 0 [elapsed]
+      (mx, my) <- liftIO $ readIORef mousePosRef
+      writeBuffer mouseBuf 0 [V2 (realToFrac mx) (realToFrac my :: Float)]
+
+      -- アニメーション付きスロットがあれば毎フレーム dirty
+      when animated $ liftIO $ writeIORef dirty True
+
       -- クリップボード操作（ContextT 内で実行する必要があるため、ここで処理）
-      -- コピー: clipboardWriteRef に text があればクリップボードに書き込む
       mCopyText <- liftIO $ readIORef clipboardWriteRef
       case mCopyText of
         Just txt -> do
           _ <- GLFW.setClipboardString win txt
           liftIO $ writeIORef clipboardWriteRef Nothing
         Nothing -> return ()
-      -- ペースト: pasteRequestRef が True ならクリップボードから読み取って PTY に送信
       wantPaste <- liftIO $ readIORef pasteRequestRef
       when wantPaste $ do
         liftIO $ writeIORef pasteRequestRef False
@@ -485,36 +475,33 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       (textShader', bgShader', curShader') <-
         if curSize /= prevSize
           then do
-            ts <- compileTextShader win curSize
-            bs <- compileBgShader win curSize
-            cs <- compileCursorShader win curSize
+            term <- liftIO $ readIORef termRef
+            let r = rows term
+                c = cols term
+            ts <- compileTextShader win curSize shaderCfg scheme cellW cellH c r
+            bs <- compileBgShader win curSize shaderCfg scheme cellW cellH c r
+            cs <- compileCursorShader win curSize shaderCfg cellW cellH c r
             return (ts, bs, cs)
           else return (textShader, bgShader, curShader)
 
       isDirty <- liftIO $ readIORef dirty
       liftIO $ writeIORef dirty False
 
-      -- ターミナル状態を取得
       term <- liftIO $ readIORef termRef
       let r = rows term
           c = cols term
           gridLen = r * c * 6
 
-      -- ターミナルサイズが変わったら固定グリッドバッファとテクスチャを再確保
       prevDim <- liftIO $ readIORef prevDimRef
       let resized = (r, c) /= prevDim
       when resized $ do
         liftIO $ writeIORef prevDimRef (r, c)
-
-        -- 固定グリッドバッファ再生成
         bg'  <- newBuffer gridLen
         txt' <- newBuffer gridLen
         writeBuffer bg' 0 (buildBgGridVertices atlas r c)
         writeBuffer txt' 0 (buildTextGridVertices atlas r c)
         liftIO $ writeIORef bgGridRef bg'
         liftIO $ writeIORef txtGridRef txt'
-
-        -- セルデータテクスチャ再生成
         bgT  <- newTexture2D RGBA32F (V2 c r) 1
         fgT  <- newTexture2D RGBA32F (V2 c r) 1
         uvT  <- newTexture2D RGBA32F (V2 c r) 1
@@ -524,8 +511,6 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
         liftIO $ writeIORef uvTexRef uvT
         liftIO $ writeIORef posTexRef posT
 
-      -- セルデータテクスチャを dirty 時のみ更新
-      -- テクスチャは GPU に保持されるため、変更がなければ再アップロード不要。
       bgTex  <- liftIO $ readIORef bgTexRef
       fgTex  <- liftIO $ readIORef fgTexRef
       uvTex  <- liftIO $ readIORef uvTexRef
@@ -535,6 +520,7 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
         scrollOff <- liftIO $ readIORef scrollOffsetRef
         sel <- liftIO $ readIORef selectionRef
         let selRange = fmap selectionRange sel
+            colorFn = mkColorResolver scheme elapsed
             (bgColors, fgColors, glyphUVs, glyphPositions) =
               buildCellData atlas term colorFn scrollOff selRange
             texSize = V2 c r
@@ -544,7 +530,6 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
         writeTexture2D uvTex  0 0 texSize glyphUVs
         writeTexture2D posTex 0 0 texSize glyphPositions
 
-        -- カーソル頂点を更新（スクロールバック表示中はカーソル非表示）
         let cursorVerts = if scrollOff > 0
                           then []
                           else buildCursorVertices atlas term (tcCursorColor cfg)
@@ -554,7 +539,6 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
           curBuf <- liftIO $ readIORef curBufRef
           writeBuffer curBuf 0 cursorVerts
 
-      -- 描画
       bgGridBuf  <- liftIO $ readIORef bgGridRef
       txtGridBuf <- liftIO $ readIORef txtGridRef
       curBuf     <- liftIO $ readIORef curBufRef
@@ -563,21 +547,22 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       render $ do
         clearWindowColor win clearCol
 
-        -- 背景色描画（bgColorTex から色を取得）
         do arr <- newVertexArray bgGridBuf
            bgShader' $ BgShaderEnv
              { bgPrimitives = toPrimitiveArray TriangleList (takeVertices gridLen arr)
              , bgColorTex = (bgTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
+             , bgTimeBuf = (timeBuf, 0)
+             , bgMouseBuf = (mouseBuf, 0)
              }
 
-        -- カーソル描画
         when (curLen > 0) $ do
           arr <- newVertexArray curBuf
           curShader' $ CursorShaderEnv
             { curPrimitives = toPrimitiveArray TriangleList (takeVertices curLen arr)
+            , curTimeBuf = (timeBuf, 0)
+            , curMouseBuf = (mouseBuf, 0)
             }
 
-        -- テキスト描画（セルデータテクスチャ + フォントアトラス）
         do arr <- newVertexArray txtGridBuf
            textShader' $ TextShaderEnv
              { tePrimitives  = toPrimitiveArray TriangleList (takeVertices gridLen arr)
@@ -585,21 +570,21 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
              , teFgColorTex  = (fgTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
              , teGlyphUVTex  = (uvTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
              , teGlyphPosTex = (posTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
+             , teTimeBuf = (timeBuf, 0)
+             , teMouseBuf = (mouseBuf, 0)
              }
 
-      -- ★ swapWindowBuffers は GLFW イベントポーリングも兼ねる
       swapWindowBuffers win
 
-      -- ウィンドウクローズ判定
       closeReq <- GLFW.windowShouldClose win
       case closeReq of
         Just True ->
-          -- シェルプロセスを終了
           liftIO $ signalProcess sigINT pid
         _ ->
           go textShader' bgShader' curShader' curSize clearCol
              bgGridRef txtGridRef curBufRef curLenRef prevDimRef
              bgTexRef fgTexRef uvTexRef posTexRef
+             timeBuf mouseBuf
 
 -- ── キーマッピング ────────────────────────────────────────
 

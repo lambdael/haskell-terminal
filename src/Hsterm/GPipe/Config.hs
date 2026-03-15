@@ -8,9 +8,9 @@ module Hsterm.GPipe.Config
   , KeyCombo(..)
   , KeyBindings
   , defaultConfig
-  , defaultColorMap
-  , defaultColorMapBright
   , defaultKeyBindings
+    -- * シェーダ設定（re-export）
+  , module Hsterm.GPipe.Shader
     -- * スクロール操作
   , scrollPageUp
   , scrollPageDown
@@ -21,19 +21,17 @@ module Hsterm.GPipe.Config
   ) where
 
 import Data.Array ((!))
-import Data.Colour (Colour)
-import Data.Colour.SRGB (sRGB24read)
 import Data.List (dropWhileEnd)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
-import Data.Word (Word8)
 import Linear (V4(..))
 
 import Graphics.GPipe.Context.GLFW (Key(..))
 
 import Terminal.Types (TerminalColor(..), Terminal(..), TerminalChar(..))
 import Hsterm.GPipe.Monad
+import Hsterm.GPipe.Shader
 
 -- | カーソルの表示スタイル。
 data CursorStyle
@@ -67,10 +65,10 @@ data TerminalConfig = TerminalConfig
     -- 空文字列の場合は @fc-match@ で自動検出する。
   , tcFontSize        :: !Int
     -- ^ フォントサイズ（ピクセル）
-  , tcColorMap        :: TerminalColor -> Colour Double
-    -- ^ 通常色パレット（基本8色 → RGB）
-  , tcColorMapBright  :: TerminalColor -> Colour Double
-    -- ^ 明るい色パレット（基本8色 → RGB）
+  , tcColorScheme     :: !ColorScheme
+    -- ^ カラースキーム（8色×2 のスロット）
+  , tcShaderConfig    :: !ShaderConfig
+    -- ^ シェーダカスタマイズ設定
   , tcDefaultFg       :: !TerminalColor
     -- ^ デフォルト前景色
   , tcDefaultBg       :: !TerminalColor
@@ -108,8 +106,7 @@ defaultConfig :: TerminalConfig
 defaultConfig = TerminalConfig
   { tcFontFamily      = ""
   , tcFontSize        = 24
-  , tcColorMap        = defaultColorMap
-  , tcColorMapBright  = defaultColorMapBright
+  , tcColorScheme     = defaultColorScheme
   , tcDefaultFg       = White
   , tcDefaultBg       = Black
   , tcCursorColor     = V4 1.0 0.2 0.9 0.8
@@ -119,33 +116,10 @@ defaultConfig = TerminalConfig
   , tcScrollback      = 10000
   , tcShell           = Nothing
   , tcFrameDelay      = 16000
+  , tcShaderConfig    = defaultShaderConfig
   , tcKeyBindings     = defaultKeyBindings
   , tcErrorMsg        = Nothing
   }
-
--- | 通常色パレット。
-defaultColorMap :: TerminalColor -> Colour Double
-defaultColorMap Black   = sRGB24read "#330000"
-defaultColorMap Red     = sRGB24read "#ff6565"
-defaultColorMap Green   = sRGB24read "#56a700"
-defaultColorMap Yellow  = sRGB24read "#eab93d"
-defaultColorMap Blue    = sRGB24read "#204a87"
-defaultColorMap Magenta = sRGB24read "#c4a000"
-defaultColorMap Cyan    = sRGB24read "#89b6e2"
-defaultColorMap White   = sRGB24read "#cccccc"
-defaultColorMap _       = sRGB24read "#cccccc"
-
--- | 明るい色パレット。
-defaultColorMapBright :: TerminalColor -> Colour Double
-defaultColorMapBright Black   = sRGB24read "#555753"
-defaultColorMapBright Red     = sRGB24read "#ff8d8d"
-defaultColorMapBright Green   = sRGB24read "#c8e7a8"
-defaultColorMapBright Yellow  = sRGB24read "#ffc123"
-defaultColorMapBright Blue    = sRGB24read "#3465a4"
-defaultColorMapBright Magenta = sRGB24read "#f57900"
-defaultColorMapBright Cyan    = sRGB24read "#46a4ff"
-defaultColorMapBright White   = sRGB24read "#ffffff"
-defaultColorMapBright _       = sRGB24read "#ffffff"
 
 -- | デフォルトのキーバインド。
 --
