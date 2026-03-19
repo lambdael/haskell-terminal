@@ -7,6 +7,7 @@ module Hsterm.GPipe.Shader
   ( -- * シェーダグローバル
     ShaderGlobals(..)
     -- * レイヤーシェーダ
+  , WallpaperShaderDef
   , BgShaderDef
   , TextShaderDef
   , CursorShaderDef
@@ -89,9 +90,26 @@ type CursorShaderDef
   -> V4 FFloat      -- ^ baseColor: カーソル色
   -> V4 FFloat      -- ^ 出力 RGBA
 
+-- | 壁紙（全画面背景）シェーダ。
+--
+-- セル情報に依存しない全画面エフェクト用。
+-- @Nothing@ の場合は壁紙レイヤーは描画されない。
+type WallpaperShaderDef
+  = ShaderGlobals
+  -> V2 FFloat      -- ^ uv: 正規化画面座標 (0..1)
+  -> V4 FFloat      -- ^ 出力 RGBA
+
 -- | レイヤー単位のシェーダカスタマイズ設定。
 data ShaderConfig = ShaderConfig
-  { scBgShader     :: BgShaderDef     -- ^ 背景レイヤーシェーダ
+  { scWallpaper    :: Maybe WallpaperShaderDef
+    -- ^ 壁紙シェーダ（全画面背景）。
+    --   @Just f@ の場合、セル背景の下に全画面 quad で描画される。
+    --   @Nothing@ の場合は従来通り clearColor で塗りつぶし。
+  , scBgAlpha      :: FFloat -> FFloat
+    -- ^ セル背景のアルファ調整関数。
+    --   壁紙を透かせるには @(\_ -> 0.5)@ のように設定する。
+    --   デフォルトは @id@（不透明）。
+  , scBgShader     :: BgShaderDef     -- ^ 背景レイヤーシェーダ
   , scTextShader   :: TextShaderDef   -- ^ テキストレイヤーシェーダ
   , scCursorShader :: CursorShaderDef -- ^ カーソルシェーダ
   }
@@ -99,7 +117,9 @@ data ShaderConfig = ShaderConfig
 -- | デフォルトのシェーダ設定（パススルー）。
 defaultShaderConfig :: ShaderConfig
 defaultShaderConfig = ShaderConfig
-  { scBgShader     = \_globals _pixelPos _cellPos _cellUV baseColor -> baseColor
+  { scWallpaper    = Nothing
+  , scBgAlpha      = id
+  , scBgShader     = \_globals _pixelPos _cellPos _cellUV baseColor -> baseColor
   , scTextShader   = \_globals _pixelPos _cellPos fgColor glyphAlpha ->
       let V4 r g b _ = fgColor
       in  V4 r g b glyphAlpha

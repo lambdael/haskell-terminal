@@ -114,7 +114,12 @@ parseANSIAnnotate :: String -> Either ParseError ([(TerminalAction, String)], St
 parseANSIAnnotate s = parse (manyWithLeftover $ annotate pSingle) "" s
 
 pSingle :: Parser TerminalAction
-pSingle = (pANSISequence <|> pChar) >>= return . simplify
+pSingle = (pANSISequence <|> pReadlineMarker <|> pChar) >>= return . simplify
+
+-- | Readline プロンプトマーカー \[ と \] を無視する。
+-- bash が SOH/STX に変換せずリテラルで出力する環境 (NixOS 等) への対応。
+pReadlineMarker :: Parser TerminalAction
+pReadlineMarker = try (char '\\' >> (char '[' <|> char ']') >> return Ignored)
 
 pANSISequence :: Parser (TerminalAction)
 pANSISequence = try (pStandardANSISeq)
@@ -133,7 +138,7 @@ pANSISequence = try (pStandardANSISeq)
     -- Catch invalid and not implemented sequences
     -- lookAhead で後続の ESC を消費しないようにする（以前は try (char '\ESC') で
     -- 次のエスケープシーケンスの ESC プレフィクスを食っていた）
-    <|> try (string "\ESC" >> notFollowedBy (string "]0;") >> manyTill anyNonEscapeChar (letter <|> lookAhead (char '\ESC')) >> return Ignored)
+    <|> try (string "\ESC" >> notFollowedBy (char ']') >> manyTill anyNonEscapeChar (letter <|> lookAhead (char '\ESC')) >> return Ignored)
 
 pStandardANSISeq = do
     string "\ESC["
@@ -147,7 +152,9 @@ pStandardANSISeq = do
       Nothing -> ANSIAction ps c
 
 pSetTerminalTitle = do
-    string "\ESC]0;"
+    string "\ESC]"
+    cmd <- many digit
+    _ <- char ';'
     title <- manyTill (satisfy (/= '\007')) (try (char '\007'))
     return (SetTerminalTitle title)
 

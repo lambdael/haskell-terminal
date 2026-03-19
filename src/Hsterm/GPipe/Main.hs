@@ -11,13 +11,12 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (SomeException(..), try, catch)
 import Control.Monad (unless, when, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.Array ((!))
+import Data.Array ((!), indices)
 import Data.Char (chr, ord)
 import Data.IORef
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import qualified Data.Map.Strict as Map
 import Data.Time.Clock (UTCTime, getCurrentTime, diffUTCTime)
-import Data.Word (Word8)
 import System.IO
 import qualified System.Process (readProcess)
 
@@ -30,10 +29,13 @@ import Graphics.GPipe.Context.GLFW (Key(..), KeyState(..), ModifierKeys(..),
                                     MouseButton(..), MouseButtonState(..))
 
 import Graphics.GPipe.Font
-import Graphics.GPipe.Font.Types (GlyphMetrics(..), GlyphRegion(..))
 import qualified Data.Sequence as Seq
 
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import System.Posix.IO (fdToHandle)
+import qualified System.Posix.IO.ByteString as POSIXBS
 import System.Posix.IOCtl (ioctl)
 import System.Posix.Signals (signalProcess, sigINT, sigTERM, installHandler, Handler(..))
 import System.Posix.Types (CPid, Fd)
@@ -53,6 +55,9 @@ import Hsterm.GPipe.Monad
 import Hsterm.GPipe.Terminal
 import Hsterm.GPipe.Renderer
 
+
+
+
 -- ── エントリーポイント ────────────────────────────────────
 
 -- | fontconfig でモノスペースフォントを探す。
@@ -70,6 +75,7 @@ findMonospaceFont pattern_ = do
 -- Dyre リロードからの復帰時はターミナル状態と PTY を復元する。
 runGPipeTerminal :: TerminalConfig -> IO ()
 runGPipeTerminal cfg = do
+  hSetBuffering stdout LineBuffering
   -- Dyre コンパイルエラーの表示
   case tcErrorMsg cfg of
     Just err -> hPutStrLn stderr $ "Configuration error:\n" ++ err
@@ -78,23 +84,33 @@ runGPipeTerminal cfg = do
   fontPath <- findMonospaceFont (tcFontFamily cfg)
   putStrLn $ "Using font: " ++ fontPath
 
+  -- CJK フォールバックフォントを検索
+  -- CJK フォールバック: 複数パターンで検索
+  let tryFcMatch pat = try $ System.Process.readProcess "fc-match" ["-f", "%{file}\\n%{index}", pat] ""
+      parseFcResult fontPath' res = case (res :: Either SomeException String) of
+        Right out ->
+          let ls = lines out
+          in case ls of
+            (fp:idx:_) | fp /= fontPath' ->
+              let faceIdx = case reads idx of { [(n,_)] -> n; _ -> 0 }
+              in [(fp, faceIdx)]
+            _ -> []
+        Left _ -> []
+  r1 <- liftIO $ tryFcMatch "Noto Sans Mono CJK JP"
+  r2 <- liftIO $ tryFcMatch "monospace:lang=ja"
+  let fallbackFonts = case parseFcResult fontPath r1 ++ parseFcResult fontPath r2 of
+        [] -> []
+        xs -> [head xs]
+  case fallbackFonts of
+    ((fp, fi):_) -> putStrLn $ "Fallback font: " ++ fp ++ " (face " ++ show fi ++ ")"
+    [] -> putStrLn "No CJK fallback font found"
+
   let pixelSize = tcFontSize cfg
 
-  -- フォントアトラスを構築
-  -- ターミナルで使用される文字セット: ASCII + ボックス描画 + ブロック要素 等
-  let termCharSet = [' '..'~']          -- ASCII printable (32-126)
-                 ++ ['\x2500'..'\x257F'] -- Box Drawing
-                 ++ ['\x2580'..'\x259F'] -- Block Elements
-                 ++ ['\x2190'..'\x21FF'] -- Arrows
-                 ++ ['\x25A0'..'\x25FF'] -- Geometric Shapes
-                 ++ ['\x2600'..'\x26FF'] -- Miscellaneous Symbols
-  atlas <- buildAtlas (defaultTextConfig fontPath) { tcPixelSize = pixelSize, tcCharSet = termCharSet }
-  putStrLn $ "Atlas: " ++ show (faWidth atlas) ++ "x" ++ show (faHeight atlas)
-    ++ ", " ++ show (Map.size (faGlyphs atlas)) ++ " glyphs"
-
-  -- セルサイズを計算
-  let cellW = cellWidth atlas
-      cellH = fromIntegral (faLineH atlas) :: Float
+  -- セルサイズを事前にクエリ（GPipe コンテキスト不要）
+  (cellW, lineH_, _asc) <- queryCellMetrics fontPath 0 pixelSize
+  putStrLn $ "Cell metrics: w=" ++ show cellW ++ " lineH=" ++ show lineH_ ++ " asc=" ++ show _asc
+  let cellH = fromIntegral lineH_ :: Float
 
   -- Dyre リロードからの復帰チェック
   mResume <- restoreResumeState
@@ -149,15 +165,28 @@ runGPipeTerminal cfg = do
           { GLFW.configWidth = winW, GLFW.configHeight = winH }
     win <- newWindow (WindowFormatColor RGBA8) winConf
 
-    -- アトラスをテクスチャにアップロード
-    fontTex <- uploadAtlasTexture atlas
+    -- 動的グリフキャッシュを作成
+    let termCharSet = [' '..'~']          -- ASCII printable (32-126)
+                   ++ ['\x2500'..'\x257F'] -- Box Drawing
+                   ++ ['\x2580'..'\x259F'] -- Block Elements
+                   ++ ['\x2190'..'\x21FF'] -- Arrows
+                   ++ ['\x25A0'..'\x25FF'] -- Geometric Shapes
+                   ++ ['\x2600'..'\x26FF'] -- Miscellaneous Symbols
+    cache <- newGlyphCache (defaultCacheConfig fontPath)
+      { gccPixelSize = pixelSize
+      , gccInitialChars = termCharSet
+      , gccFallbackFonts = fallbackFonts
+      }
+    liftIO $ putStrLn $ "GlyphCache created, pre-loaded " ++ show (length termCharSet) ++ " chars"
+
+
 
     -- PTY にバイト列を送る共通ヘルパー
     let sendPtyIO :: String -> IO ()
         sendPtyIO s = do
-          hPutStr stderr $ "sendPty: " ++ show (map ord s) ++ "\n"
-          hPutStr (ptyMaster pty) s
-          hFlush (ptyMaster pty)
+          let bs = TE.encodeUtf8 (T.pack s)
+          _ <- POSIXBS.fdWrite (ptyFd pty) bs
+          return ()
 
     -- HstermM アクション実行用の環境
     let hstermEnv = HstermEnv
@@ -178,6 +207,12 @@ runGPipeTerminal cfg = do
 
     -- Ctrl が押されているかを追跡する（charCallback で制御文字を二重送信しないため）
     ctrlHeld <- liftIO $ newIORef False
+    -- IME 確定と Enter キーの衝突を防ぐ（遅延方式）。
+    -- Enter キー押下を一定時間（100ms）保留し、その間に IME の charCallback が
+    -- 発火したら CR を抑制する。charCallback と keyCallback が異なる
+    -- pollEvents サイクルに分かれる場合にも対応する。
+    pendingEnterRef <- liftIO $ newIORef (Nothing :: Maybe UTCTime)
+    imeAfterEnterRef <- liftIO $ newIORef False
 
     -- キー入力コールバック（文字入力用）
     -- GLFW の charCallback は印字可能な Unicode 文字だけ発火する。
@@ -187,6 +222,10 @@ runGPipeTerminal cfg = do
       isCtrl <- readIORef ctrlHeld
       unless isCtrl $ do
         writeIORef scrollOffsetRef 0
+        -- 非 ASCII 文字は IME からの入力と判断
+        when (ord ch > 127) $ do
+          pending <- readIORef pendingEnterRef
+          when (isJust pending) $ writeIORef imeAfterEnterRef True
         sendPtyIO [ch]
 
     -- キー入力コールバック（制御キー用）
@@ -211,8 +250,11 @@ runGPipeTerminal cfg = do
               _ | ctrl, Just c <- keyToAlpha key ->
                 sendPtyIO [chr (ord c - ord 'a' + 1)]
 
-              -- Enter → CR
-              Key'Enter     -> sendPtyIO "\r"
+              -- Enter → 遅延処理（IME 確定との衝突を避けるため）
+              Key'Enter     -> do
+                now <- getCurrentTime
+                writeIORef pendingEnterRef (Just now)
+                writeIORef imeAfterEnterRef False
               -- Backspace → DEL (0x7F)
               Key'Backspace -> sendPtyIO "\x7f"
               -- Tab → HT
@@ -335,8 +377,25 @@ runGPipeTerminal cfg = do
         signalProcess 28 (ptyPid pty)  -- SIGWINCH
 
     -- メインループ
+    -- pollEvents 後に遅延 Enter を処理するクロージャ
+    -- Enter と IME 確定の衝突を順序非依存で解決する
+    let processPostEvents = do
+          mPending <- readIORef pendingEnterRef
+          case mPending of
+            Nothing -> return ()
+            Just enterTime -> do
+              now <- getCurrentTime
+              let elapsed = diffUTCTime now enterTime
+              -- 100ms 待ってから判断（IME charCallback の到着を待つ）
+              when (elapsed >= 0.1) $ do
+                imeOccurred <- readIORef imeAfterEnterRef
+                -- IME 入力がなかった場合のみ CR を送信
+                unless imeOccurred $ sendPtyIO "\r"
+                writeIORef pendingEnterRef Nothing
+                writeIORef imeAfterEnterRef False
+
     startTime <- liftIO getCurrentTime
-    mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPtyIO (ptyPid pty) mousePosRef startTime
+    mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPtyIO (ptyPid pty) mousePosRef startTime cellW cellH
 
 -- | メインループ。
 --
@@ -354,8 +413,7 @@ runGPipeTerminal cfg = do
 -- 各セルの情報を取得するため、頂点データは画面内容に依存しない。
 mainLoop
   :: Window os RGBAFloat ()
-  -> Texture2D os (Format RFloat)
-  -> FontAtlas
+  -> GlyphCache os
   -> TerminalConfig
   -> IORef Terminal
   -> IORef Bool
@@ -364,19 +422,22 @@ mainLoop
   -> IORef (Maybe Selection) -- ^ selectionRef
   -> IORef (Maybe String)  -- ^ clipboardWriteRef
   -> IORef Bool            -- ^ pasteRequestRef
+  -> IO ()                 -- ^ processPostEvents (IME/Enter handling)
   -> (String -> IO ())     -- ^ sendPty
   -> CPid
   -> IORef (Double, Double) -- ^ mousePosRef
   -> UTCTime -- ^ startTime
+  -> Float   -- ^ cellW
+  -> Float   -- ^ cellH
   -> ContextT GLFW.Handle os IO ()
-mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef sendPty pid mousePosRef startTime = do
+mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPty pid mousePosRef startTime cellW cellH = do
+  -- 初期 FontInfo を取得
+  fi0 <- liftIO $ cacheFontInfo cache
   -- ウィンドウサイズを取得
   winSize <- liftIO $ readIORef winSizeRef
 
   let scheme    = tcColorScheme cfg
       shaderCfg = tcShaderConfig cfg
-      cellW     = cellWidth atlas
-      cellH     = fromIntegral (faLineH atlas) :: Float
       animated  = hasAnimatedSlots scheme
 
   -- 初期ターミナルサイズから固定グリッドバッファ確保
@@ -385,10 +446,22 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       c0 = cols term0
       gridCap = r0 * c0 * 6
 
-  -- シェーダーをコンパイル（3種: 背景・テキスト・カーソル）
+  -- シェーダーをコンパイル（3種: 背景・テキスト・カーソル + 壁紙）
   textShader <- compileTextShader win winSize shaderCfg scheme cellW cellH c0 r0
   bgShader   <- compileBgShader win winSize shaderCfg scheme cellW cellH c0 r0
   curShader  <- compileCursorShader win winSize shaderCfg cellW cellH c0 r0
+
+  -- 壁紙シェーダ（オプショナル）
+  wpShader <- case scWallpaper shaderCfg of
+    Just wpFn -> fmap Just $ compileWallpaperShader win winSize wpFn cellW cellH c0 r0
+    Nothing   -> return Nothing
+
+  -- 壁紙用全画面 quad バッファ（UV: 0..1）
+  wpBuf <- newBuffer 6 :: ContextT GLFW.Handle os IO (Buffer os (B2 Float))
+  writeBuffer wpBuf 0
+    [ V2 0 0, V2 1 0, V2 0 1
+    , V2 1 0, V2 1 1, V2 0 1
+    ]
 
   -- 背景クリア色（デフォルト背景スロットの静的色部分）
   let clearCol = case csNormal scheme (tcDefaultBg cfg) of
@@ -399,8 +472,8 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
   txtGridBuf <- newBuffer gridCap
   curBuf     <- newBuffer (6 :: Int)
 
-  writeBuffer bgGridBuf 0 (buildBgGridVertices atlas r0 c0)
-  writeBuffer txtGridBuf 0 (buildTextGridVertices atlas r0 c0)
+  writeBuffer bgGridBuf 0 (buildBgGridVertices fi0 r0 c0)
+  writeBuffer txtGridBuf 0 (buildBgGridVertices fi0 r0 c0)
 
   -- セルデータテクスチャ（cols×rows, RGBA32F）
   bgColorTex'  <- newTexture2D RGBA32F (V2 c0 r0) 1
@@ -423,22 +496,20 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
   uvTexRef  <- liftIO $ newIORef glyphUVTex'
   posTexRef <- liftIO $ newIORef glyphPosTex'
 
-  go textShader bgShader curShader winSize clearCol
+  go textShader bgShader curShader wpShader winSize clearCol
      bgGridRef txtGridRef curBufRef curLenRef prevDimRef
      bgTexRef fgTexRef uvTexRef posTexRef
-     timeBuf mouseBuf
+     timeBuf mouseBuf wpBuf
   where
     scheme    = tcColorScheme cfg
     shaderCfg = tcShaderConfig cfg
-    cellW     = cellWidth atlas
-    cellH     = fromIntegral (faLineH atlas) :: Float
     animated  = hasAnimatedSlots scheme
     nearestFilter = SamplerFilter Nearest Nearest Nearest Nothing
 
-    go textShader bgShader curShader prevSize clearCol
+    go textShader bgShader curShader wpShader prevSize clearCol
        bgGridRef txtGridRef curBufRef curLenRef prevDimRef
        bgTexRef fgTexRef uvTexRef posTexRef
-       timeBuf mouseBuf = do
+       timeBuf mouseBuf wpBuf = do
       -- フレームレート制限
       liftIO $ threadDelay (tcFrameDelay cfg)
 
@@ -472,7 +543,7 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       curSize <- liftIO $ readIORef winSizeRef
 
       -- ウィンドウサイズが変わったらシェーダーを再コンパイル
-      (textShader', bgShader', curShader') <-
+      (textShader', bgShader', curShader', wpShader') <-
         if curSize /= prevSize
           then do
             term <- liftIO $ readIORef termRef
@@ -481,8 +552,11 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
             ts <- compileTextShader win curSize shaderCfg scheme cellW cellH c r
             bs <- compileBgShader win curSize shaderCfg scheme cellW cellH c r
             cs <- compileCursorShader win curSize shaderCfg cellW cellH c r
-            return (ts, bs, cs)
-          else return (textShader, bgShader, curShader)
+            ws <- case scWallpaper shaderCfg of
+              Just wpFn -> fmap Just $ compileWallpaperShader win curSize wpFn cellW cellH c r
+              Nothing   -> return Nothing
+            return (ts, bs, cs, ws)
+          else return (textShader, bgShader, curShader, wpShader)
 
       isDirty <- liftIO $ readIORef dirty
       liftIO $ writeIORef dirty False
@@ -496,12 +570,12 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       let resized = (r, c) /= prevDim
       when resized $ do
         liftIO $ writeIORef prevDimRef (r, c)
+        fi <- liftIO $ cacheFontInfo cache
         bg'  <- newBuffer gridLen
-        txt' <- newBuffer gridLen
-        writeBuffer bg' 0 (buildBgGridVertices atlas r c)
-        writeBuffer txt' 0 (buildTextGridVertices atlas r c)
+        writeBuffer bg' 0 (buildBgGridVertices fi r c)
+
         liftIO $ writeIORef bgGridRef bg'
-        liftIO $ writeIORef txtGridRef txt'
+        liftIO $ writeIORef txtGridRef bg'
         bgT  <- newTexture2D RGBA32F (V2 c r) 1
         fgT  <- newTexture2D RGBA32F (V2 c r) 1
         uvT  <- newTexture2D RGBA32F (V2 c r) 1
@@ -519,10 +593,14 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
       when (isDirty || resized) $ do
         scrollOff <- liftIO $ readIORef scrollOffsetRef
         sel <- liftIO $ readIORef selectionRef
+        -- 画面上のすべての文字を収集し、動的キャッシュに追加
+        let visibleChars = [character (screen term ! idx) | idx <- indices (screen term)]
+        ensureGlyphs cache visibleChars
+        fi <- liftIO $ cacheFontInfo cache
         let selRange = fmap selectionRange sel
             colorFn = mkColorResolver scheme elapsed
             (bgColors, fgColors, glyphUVs, glyphPositions) =
-              buildCellData atlas term colorFn scrollOff selRange
+              buildCellData fi term colorFn scrollOff selRange
             texSize = V2 c r
 
         writeTexture2D bgTex  0 0 texSize bgColors
@@ -530,9 +608,10 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
         writeTexture2D uvTex  0 0 texSize glyphUVs
         writeTexture2D posTex 0 0 texSize glyphPositions
 
+
         let cursorVerts = if scrollOff > 0
                           then []
-                          else buildCursorVertices atlas term (tcCursorColor cfg)
+                          else buildCursorVertices fi term (tcCursorColor cfg)
             curLen = length cursorVerts
         liftIO $ writeIORef curLenRef curLen
         when (curLen > 0) $ do
@@ -546,6 +625,17 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
 
       render $ do
         clearWindowColor win clearCol
+
+        -- 壁紙レイヤー（オプショナル）
+        case wpShader' of
+          Just ws -> do
+            arr <- newVertexArray wpBuf
+            ws $ WallpaperShaderEnv
+              { wpPrimitives = toPrimitiveArray TriangleList arr
+              , wpTimeBuf = (timeBuf, 0)
+              , wpMouseBuf = (mouseBuf, 0)
+              }
+          Nothing -> return ()
 
         do arr <- newVertexArray bgGridBuf
            bgShader' $ BgShaderEnv
@@ -563,10 +653,10 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
             , curMouseBuf = (mouseBuf, 0)
             }
 
-        do arr <- newVertexArray txtGridBuf
+        do arr <- newVertexArray bgGridBuf  -- reuse bg grid (same format after VTF fix)
            textShader' $ TextShaderEnv
              { tePrimitives  = toPrimitiveArray TriangleList (takeVertices gridLen arr)
-             , teFontAtlas   = (fontTex, SamplerFilter Linear Linear Linear Nothing, (pure ClampToEdge, 0))
+             , teFontAtlas   = (cacheTexture cache, SamplerFilter Linear Linear Linear Nothing, (pure ClampToEdge, 0))
              , teFgColorTex  = (fgTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
              , teGlyphUVTex  = (uvTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
              , teGlyphPosTex = (posTex, nearestFilter, (pure ClampToEdge, V4 0 0 0 0))
@@ -574,17 +664,22 @@ mainLoop win fontTex atlas cfg termRef dirty winSizeRef scrollOffsetRef selectio
              , teMouseBuf = (mouseBuf, 0)
              }
 
+
       swapWindowBuffers win
+
+      -- swapWindowBuffers が pollEvents を呼ぶので、ここで全イベント処理済み
+      -- 遅延 Enter 処理: IME 確定と衝突しない場合のみ CR を送信
+      liftIO processPostEvents
 
       closeReq <- GLFW.windowShouldClose win
       case closeReq of
         Just True ->
           liftIO $ signalProcess sigINT pid
         _ ->
-          go textShader' bgShader' curShader' curSize clearCol
+          go textShader' bgShader' curShader' wpShader' curSize clearCol
              bgGridRef txtGridRef curBufRef curLenRef prevDimRef
              bgTexRef fgTexRef uvTexRef posTexRef
-             timeBuf mouseBuf
+             timeBuf mouseBuf wpBuf
 
 -- ── キーマッピング ────────────────────────────────────────
 

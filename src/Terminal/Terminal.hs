@@ -397,6 +397,10 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
       t = case act of
             Ignored             -> term
 
+            -- C0 制御文字で無視するもの
+            CharInput c | c < ' ', c /= '\a', c /= '\t', c /= '\n', c /= '\r', c /= '\b'
+                        -> term
+
             -- Bell
             CharInput '\a'      -> term 
 
@@ -421,11 +425,27 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
               let term0 = resolvePending term
                   (y0, x0) = cursorPos term0
                   pos0 = (y0, x0)
-              in if x0 >= c
-                 -- 最終列: 文字を書いて pending wrap 状態にする
-                 then (write term0 [(pos0, mkChar ch term0)]) { pendingWrap = True }
-                 -- 通常: 文字を書いてカーソルを右に進める
-                 else (write term0 [(pos0, mkChar ch term0)]) { cursorPos = (y0, x0 + 1) }
+                  wide = isWideChar ch
+              in if wide
+                 then -- ワイド文字: 2セル分を使用
+                   if x0 >= c
+                   then -- 最終列: ワイド文字は収まらないのでpending wrap
+                     (write term0 [(pos0, mkChar ch term0)]) { pendingWrap = True }
+                   else if x0 >= c - 1
+                   then -- 残り1セル: ワイド文字は収まらないのでpending wrap（右側は画面外）
+                     let contCell = (mkEmptyChar term0) { character = wideCharContinuation }
+                     in (write term0 [(pos0, mkChar ch term0),
+                                      ((y0, x0 + 1), contCell)]) { pendingWrap = True }
+                   else -- 通常: 2セル書いてカーソルを2つ進める
+                     let contCell = (mkEmptyChar term0) { character = wideCharContinuation }
+                     in (write term0 [(pos0, mkChar ch term0),
+                                      ((y0, x0 + 1), contCell)]) { cursorPos = (y0, x0 + 2) }
+                 else -- 半角文字: 従来の処理
+                   if x0 >= c
+                   -- 最終列: 文字を書いて pending wrap 状態にする
+                   then (write term0 [(pos0, mkChar ch term0)]) { pendingWrap = True }
+                   -- 通常: 文字を書いてカーソルを右に進める
+                   else (write term0 [(pos0, mkChar ch term0)]) { cursorPos = (y0, x0 + 1) }
 
             -- Cursor movements (pending wrap をキャンセル)
             CursorUp n          -> (iterate up (term { pendingWrap = False })) !! n
@@ -554,21 +574,39 @@ applyActionsBatched term actions = go term actions []
 
     -- 通常文字入力: 画面書き込みを蓄積しカーソルだけ進める
     go term (CharInput c : rest) pending
-      | c /= '\a', c /= '\t', c /= '\n', c /= '\r', c /= '\b'
+      | c >= ' '  -- C0 制御文字は batched path では処理しない
       = let term0 = if pendingWrap term then flush term pending else term
             term1 = resolvePending term0
             (y, x) = cursorPos term1
             pending' = if pendingWrap term then [] else pending
+            wide = isWideChar c
+            cc = cols term1
+            contCell = (mkEmptyChar term1) { character = wideCharContinuation }
         in if x >= 1 && y >= 1 && y <= rows term1
-           then if x >= cols term1
-                -- 最終列: 文字を書いて pending wrap
-                then go (term1 { pendingWrap = True })
-                        rest
-                        (((y, x), mkChar c term1) : pending')
-                -- 通常: 文字を書いてカーソルを右へ
-                else go (term1 { cursorPos = (y, x + 1) })
-                        rest
-                        (((y, x), mkChar c term1) : pending')
+           then if wide
+                then -- ワイド文字: 2セル分を使用
+                  if x >= cc
+                  then -- 最終列: ワイド文字は収まらないのでpending wrap
+                    go (term1 { pendingWrap = True })
+                       rest
+                       (((y, x), mkChar c term1) : pending')
+                  else if x >= cc - 1
+                  then -- 残り1セル: pending wrap
+                    go (term1 { pendingWrap = True })
+                       rest
+                       (((y, x + 1), contCell) : ((y, x), mkChar c term1) : pending')
+                  else -- 通常: 2セル書いてカーソルを2つ進める
+                    go (term1 { cursorPos = (y, x + 2) })
+                       rest
+                       (((y, x + 1), contCell) : ((y, x), mkChar c term1) : pending')
+                else -- 半角文字: 従来の処理
+                  if x >= cc
+                  then go (term1 { pendingWrap = True })
+                          rest
+                          (((y, x), mkChar c term1) : pending')
+                  else go (term1 { cursorPos = (y, x + 1) })
+                          rest
+                          (((y, x), mkChar c term1) : pending')
            else go (applyAction (flush term1 pending') (CharInput c)) rest []
 
     -- SGR (色・属性変更): 画面は触らない

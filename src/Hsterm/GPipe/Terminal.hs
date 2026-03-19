@@ -27,6 +27,7 @@ import System.Posix.IO (fdToHandle, closeFd, dupTo, stdInput, stdOutput, stdErro
 import System.Posix.Process (forkProcess, executeFile, createSession, getProcessID)
 import System.Posix.Signals (signalProcess, Signal)
 import System.Posix.Terminal hiding (TerminalState)
+import System.Posix.User (getRealUserID, getUserEntryForID, userShell)
 import System.Posix.Types (CPid, Fd)
 
 import Terminal.Parser (parseANSI)
@@ -57,10 +58,14 @@ data PtyHandle = PtyHandle
 spawnShell :: Maybe FilePath -> IO PtyHandle
 spawnShell mShell = do
   rawenv <- getEnvironment
+  -- ログインシェルを passwd から取得（nix develop が $SHELL を
+  -- readline なしの bash に変えてしまうため、$SHELL は使わない）
+  uid <- getRealUserID
+  userEntry <- getUserEntryForID uid
   let shell = case mShell of
         Just s  -> s
-        Nothing -> fromMaybe "bash" $ lookup "SHELL" rawenv
-      environment = [("TERM", "xterm")]
+        Nothing -> userShell userEntry
+      environment = [("TERM", "xterm"), ("SHELL", shell)]
       env' = override rawenv environment
 
   (masterFd, slaveFd) <- openPseudoTerminal
@@ -93,6 +98,7 @@ spawnShell mShell = do
 
   master <- fdToHandle masterFd
   hSetBuffering master NoBuffering
+  hSetEncoding master utf8
 
   pure PtyHandle
     { ptyMaster = master

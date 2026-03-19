@@ -19,6 +19,49 @@ import qualified System.Console.Terminfo as TI
 -- | スクリーン上の座標。@(行, 列)@ で 1-indexed。
 type ScreenIndex = (Int, Int)
 
+-- | ワイド文字の右半分セルに使用するマーカー。
+-- この文字が character フィールドに入っている場合、
+-- セルは左隣のワイド文字の継続部分であり、描画をスキップする。
+wideCharContinuation :: Char
+wideCharContinuation = '\0'
+
+-- | ワイド文字の継続セルかどうかを判定する。
+isWideContinuation :: TerminalChar -> Bool
+isWideContinuation tc = character tc == wideCharContinuation
+
+-- | Unicode East Asian Width に基づき、文字が全角（2セル幅）かどうかを判定する。
+isWideChar :: Char -> Bool
+isWideChar c = let cp = ord c in
+  -- CJK Unified Ideographs
+     (cp >= 0x4E00  && cp <= 0x9FFF)
+  -- CJK Extension A
+  || (cp >= 0x3400  && cp <= 0x4DBF)
+  -- CJK Extension B-I (Supplementary)
+  || (cp >= 0x20000 && cp <= 0x323AF)
+  -- CJK Compatibility Ideographs
+  || (cp >= 0xF900  && cp <= 0xFAFF)
+  -- CJK Radicals Supplement
+  || (cp >= 0x2E80  && cp <= 0x2EFF)
+  -- Kangxi Radicals
+  || (cp >= 0x2F00  && cp <= 0x2FDF)
+  -- CJK Symbols and Punctuation
+  || (cp >= 0x3000  && cp <= 0x303F)
+  -- Hiragana
+  || (cp >= 0x3040  && cp <= 0x309F)
+  -- Katakana
+  || (cp >= 0x30A0  && cp <= 0x30FF)
+  -- Katakana Phonetic Extensions
+  || (cp >= 0x31F0  && cp <= 0x31FF)
+  -- Bopomofo
+  || (cp >= 0x3100  && cp <= 0x312F)
+  -- Hangul Compatibility Jamo
+  || (cp >= 0x3130  && cp <= 0x318F)
+  -- Hangul Syllables
+  || (cp >= 0xAC00  && cp <= 0xD7A3)
+  -- Fullwidth Forms
+  || (cp >= 0xFF01  && cp <= 0xFF60)
+  || (cp >= 0xFFE0  && cp <= 0xFFE6)
+
 -- | ターミナル画面の1セルを表す。
 -- 文字そのものに加え、前景色・背景色・表示属性を保持する。
 data TerminalChar = TerminalChar {

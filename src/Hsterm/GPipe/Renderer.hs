@@ -13,10 +13,12 @@ module Hsterm.GPipe.Renderer
     TextShaderEnv(..)
   , BgShaderEnv(..)
   , CursorShaderEnv(..)
+  , WallpaperShaderEnv(..)
     -- * シェーダーコンパイル
   , compileTextShader
   , compileBgShader
   , compileCursorShader
+  , compileWallpaperShader
     -- * 固定グリッド頂点（リサイズ時のみ再生成）
   , buildBgGridVertices
   , buildTextGridVertices
@@ -37,7 +39,7 @@ import qualified Data.Sequence as Seq
 import Graphics.GPipe
 import Linear (V2(..), V4(..))
 
-import Graphics.GPipe.Font.Types (FontAtlas(..), GlyphRegion(..), GlyphMetrics(..))
+import Graphics.GPipe.Font.Types (FontInfo(..), GlyphRegion(..), GlyphMetrics(..))
 
 import Terminal.Types
 import Hsterm.GPipe.Shader
@@ -46,7 +48,7 @@ import Hsterm.GPipe.Shader
 
 -- | テキスト描画用シェーダー環境（セルデータテクスチャ方式）。
 data TextShaderEnv os = TextShaderEnv
-  { tePrimitives  :: PrimitiveArray Triangles (B2 Float, B2 Float, B2 Float)
+  { tePrimitives  :: PrimitiveArray Triangles (B2 Float, B2 Float)
   , teFontAtlas   :: (Texture2D os (Format RFloat), SamplerFilter RFloat, (EdgeMode2, BorderColor RFloat))
   , teFgColorTex  :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
   , teGlyphUVTex  :: (Texture2D os (Format RGBAFloat), SamplerFilter RGBAFloat, (EdgeMode2, BorderColor RGBAFloat))
@@ -68,6 +70,13 @@ data CursorShaderEnv os = CursorShaderEnv
   { curPrimitives :: PrimitiveArray Triangles (B2 Float, B4 Float, B2 Float)
   , curTimeBuf    :: (Buffer os (Uniform (B Float)), Int)
   , curMouseBuf   :: (Buffer os (Uniform (B2 Float)), Int)
+  }
+
+-- | 壁紙（全画面背景）描画用シェーダー環境。
+data WallpaperShaderEnv os = WallpaperShaderEnv
+  { wpPrimitives :: PrimitiveArray Triangles (B2 Float)
+  , wpTimeBuf    :: (Buffer os (Uniform (B Float)), Int)
+  , wpMouseBuf   :: (Buffer os (Uniform (B2 Float)), Int)
   }
 
 -- ── シェーダーコンパイル ──────────────────────────────────
@@ -96,19 +105,15 @@ compileTextShader win winSize shaderCfg colorScheme cellW cellH numCols numRows 
 
     prims <- toPrimitiveStream tePrimitives
 
+    -- Use full-cell quads (same vertex format as bg shader: (pixelPos, cellUV))
+    -- Position texture is sampled in fragment shader to avoid vertex texture
+    -- fetch issues on Intel GPUs.
     let V2 sw sh = fmap fromIntegral winSize :: V2 VFloat
-        projected = fmap (\(cellTL, cellUV, corner) ->
-          let V4 ox oy gw gh = sample2D posSamp (SampleLod 0) Nothing Nothing cellUV
-              V4 u0 v0 u1 v1 = sample2D uvSamp  (SampleLod 0) Nothing Nothing cellUV
-              V2 lx ly = corner
-              V2 tlx tly = cellTL
-              px = tlx + ox + lx * gw
-              py = tly + oy + ly * gh
-              u = u0 + lx * (u1 - u0)
-              v = v0 + ly * (v1 - v0)
+        projected = fmap (\(pos, cellUV) ->
+          let V2 px py = pos
               cx = px * 2 / sw - 1
               cy = 1 - py * 2 / sh
-          in  (V4 cx cy 0 1, (V2 u v, cellUV, V2 px py))
+          in  (V4 cx cy 0 1, (cellUV, V2 px py))
           ) prims
 
     frags <- rasterize
@@ -126,21 +131,39 @@ compileTextShader win winSize shaderCfg colorScheme cellW cellH numCols numRows 
           , sgGridSize   = V2 (fromIntegral numCols) (fromIntegral numRows)
           , sgCellSize   = V2 (realToFrac cellW) (realToFrac cellH)
           }
-        colored = fmap (\(uv, cellUV, pixelPos) ->
-          let glyphAlpha = sample2D fontSamp SampleAuto Nothing Nothing uv
+        colored = fmap (\(cellUV, pixelPos) ->
+          let V2 cw ch = sgCellSize globals
+              V2 px py = pixelPos
+              -- Glyph subrect from position texture (sampled in fragment shader)
+              V4 ox oy gw gh = sample2D posSamp SampleAuto Nothing Nothing cellUV
+              -- Atlas UV rect
+              V4 u0 v0 u1 v1 = sample2D uvSamp SampleAuto Nothing Nothing cellUV
+              -- Local offset within cell
+              cellTLx = floor' (px / cw) * cw
+              cellTLy = floor' (py / ch) * ch
+              localX = px - cellTLx
+              localY = py - cellTLy
+              -- Check if fragment is inside glyph subrect
+              insideGlyph = localX >=* ox &&* localX <* (ox + gw)
+                        &&* localY >=* oy &&* localY <* (oy + gh)
+              -- Compute atlas UV for this fragment
+              t = ifThenElse' (gw >* 0) ((localX - ox) / gw) 0
+              s = ifThenElse' (gh >* 0) ((localY - oy) / gh) 0
+              u = u0 + t * (u1 - u0)
+              v = v0 + s * (v1 - v0)
+              glyphAlpha = sample2D fontSamp SampleAuto Nothing Nothing (V2 u v)
+              -- Foreground color
               rawFg = sample2D fgSamp SampleAuto Nothing Nothing cellUV
               V4 _fr _fg _fb fa = rawFg
-              -- ColorShader ディスパッチ: alpha < 0 ならスロットインデックス
-              V2 cw ch = sgCellSize globals
-              V2 px py = pixelPos
               cellPos = V2 (floor' (px / cw)) (floor' (py / ch))
               cellUV' = V2 (fract' (px / cw)) (fract' (py / ch))
               fgColor = ifThenElse' (fa >=* 0)
                 rawFg
                 (buildColorShaderDispatch colorShaderSlots globals cellPos cellUV' _fr)
-          in  scTextShader shaderCfg globals pixelPos cellPos fgColor glyphAlpha
+              V4 fR fG fB _ = fgColor
+              finalAlpha = ifThenElse' insideGlyph glyphAlpha 0
+          in  V4 fR fG fB finalAlpha
           ) frags
-
     drawWindowColor
       (const (win, ContextColorOption (BlendRgbAlpha
         (FuncAdd, FuncAdd)
@@ -201,15 +224,21 @@ compileBgShader win winSize shaderCfg colorScheme cellW cellH numCols numRows =
               baseColor = ifThenElse' (ca >=* 0)
                 rawColor
                 (buildColorShaderDispatch colorShaderSlots globals cellPos cellUV' _cr)
-          in  scBgShader shaderCfg globals pixelPos cellPos cellUV' baseColor
+          in  baseColor
           ) frags
+        -- scBgAlpha でアルファを調整（壁紙を透かせるため）
+        -- DEBUG: 全セルを緑色で強制描画
+        alphaAdjusted = fmap (\c ->
+          let V4 cr cg cb ca = c
+          in V4 cr cg cb (scBgAlpha shaderCfg ca)
+          ) colored
 
     drawWindowColor
       (const (win, ContextColorOption (BlendRgbAlpha
         (FuncAdd, FuncAdd)
         (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero)
         (V4 0 0 0 0)) (pure True)))
-      colored
+      alphaAdjusted
 
 -- | カーソル描画シェーダー。
 compileCursorShader
@@ -262,13 +291,61 @@ compileCursorShader win winSize shaderCfg cellW cellH numCols numRows =
         (V4 0 0 0 0)) (pure True)))
       colored
 
+-- | 壁紙（全画面背景）シェーダー。
+--
+-- 画面全体をカバーする 1 枚の quad を描画し、ユーザ定義シェーダで色を決定する。
+compileWallpaperShader
+  :: (ContextHandler ctx)
+  => Window os RGBAFloat ()
+  -> V2 Int             -- ^ ウィンドウサイズ
+  -> WallpaperShaderDef -- ^ ユーザ壁紙シェーダ
+  -> Float              -- ^ cellWidth
+  -> Float              -- ^ cellHeight
+  -> Int                -- ^ cols
+  -> Int                -- ^ rows
+  -> ContextT ctx os IO (CompiledShader os (WallpaperShaderEnv os))
+compileWallpaperShader win winSize wallpaperFn cellW cellH numCols numRows =
+  compileShader $ do
+    time  <- getUniform wpTimeBuf
+    mouse <- getUniform wpMouseBuf
+
+    prims <- toPrimitiveStream wpPrimitives
+
+    -- 頂点は正規化座標 (0..1) の quad、クリップ空間に変換
+    let projected = fmap (\uv ->
+          let V2 u v = uv
+              cx = u * 2 - 1
+              cy = 1 - v * 2
+          in  (V4 cx cy 0 1, uv)
+          ) prims
+
+    frags <- rasterize
+      (const ( FrontAndBack
+             , ViewPort (V2 0 0) winSize
+             , DepthRange 0 1
+             ))
+      projected
+
+    let globals = ShaderGlobals
+          { sgTime       = time
+          , sgResolution = fmap fromIntegral winSize
+          , sgMouse      = mouse
+          , sgGridSize   = V2 (fromIntegral numCols) (fromIntegral numRows)
+          , sgCellSize   = V2 (realToFrac cellW) (realToFrac cellH)
+          }
+        colored = fmap (wallpaperFn globals) frags
+
+    drawWindowColor
+      (const (win, ContextColorOption NoBlending (pure True)))
+      colored
+
 -- ── ユーティリティ ────────────────────────────────────────
 
--- | フォントアトラスからモノスペースのセル幅を計算する。
-cellWidth :: FontAtlas -> Float
-cellWidth atlas = case Map.lookup ' ' (faGlyphs atlas) of
+-- | フォント情報からモノスペースのセル幅を計算する。
+cellWidth :: FontInfo -> Float
+cellWidth fi = case Map.lookup ' ' (fiGlyphs fi) of
   Just gr -> fromIntegral (gmAdvanceX (grMetrics gr))
-  Nothing -> fromIntegral (faLineH atlas) * 0.5
+  Nothing -> fromIntegral (fiLineH fi) * 0.5
 
 -- ── 固定グリッド頂点（リサイズ時のみ生成） ──────────────────
 
@@ -279,15 +356,15 @@ cellWidth atlas = case Map.lookup ' ' (faGlyphs atlas) of
 -- cellTexCoord = セルデータテクスチャの対応テクセル中心（全6頂点で同一値）。
 -- リサイズ時にのみ呼び出し、結果を GPU バッファに書き込む。
 buildBgGridVertices
-  :: FontAtlas
+  :: FontInfo
   -> Int    -- ^ rows
   -> Int    -- ^ cols
   -> [(V2 Float, V2 Float)]
-buildBgGridVertices atlas r c =
+buildBgGridVertices fi r c =
   concatMap mkQuad [(row, col) | row <- [1..r], col <- [1..c]]
   where
-    cw = cellWidth atlas
-    fh = fromIntegral (faLineH atlas) :: Float
+    cw = cellWidth fi
+    fh = fromIntegral (fiLineH fi) :: Float
     totalCols = fromIntegral c :: Float
     totalRows = fromIntegral r :: Float
 
@@ -312,15 +389,15 @@ buildBgGridVertices atlas r c =
 --   @(0,0), (1,0), (1,1), (0,0), (1,1), (0,1)@
 -- リサイズ時にのみ呼び出し、結果を GPU バッファに書き込む。
 buildTextGridVertices
-  :: FontAtlas
+  :: FontInfo
   -> Int    -- ^ rows
   -> Int    -- ^ cols
   -> [(V2 Float, V2 Float, V2 Float)]
-buildTextGridVertices atlas r c =
+buildTextGridVertices fi r c =
   concatMap mkQuad [(row, col) | row <- [1..r], col <- [1..c]]
   where
-    cw = cellWidth atlas
-    fh = fromIntegral (faLineH atlas) :: Float
+    cw = cellWidth fi
+    fh = fromIntegral (fiLineH fi) :: Float
     totalCols = fromIntegral c :: Float
     totalRows = fromIntegral r :: Float
 
@@ -349,7 +426,7 @@ buildTextGridVertices atlas r c =
 -- @scrollOffset@ が正の場合、スクロールバック履歴を表示する。
 -- @selection@ が @Just ((r1,c1),(r2,c2))@ の場合、選択範囲の前景色・背景色を反転する。
 buildCellData
-  :: FontAtlas
+  :: FontInfo
   -> Terminal
   -> (Bool -> TerminalColor -> V4 Float)
   -> Int    -- ^ scrollOffset (0 = 通常表示, >0 = 履歴をスクロール表示)
@@ -359,10 +436,10 @@ buildCellData
      , [V4 Float]   -- ^ glyphUV (u0,v0,u1,v1) per cell
      , [V4 Float]   -- ^ glyphPos (ox,oy,w,h) per cell
      )
-buildCellData atlas term colorFn scrollOffset selection =
+buildCellData fi term colorFn scrollOffset selection =
   unzip4 $ map cellData (indices (screen term))
   where
-    asc = fromIntegral (faAscender atlas) :: Float
+    asc = fromIntegral (fiAscender fi) :: Float
     sbuf = scrollbackBuffer term
     sbLen = Seq.length sbuf
     r = rows term
@@ -403,11 +480,26 @@ buildCellData atlas term colorFn scrollOffset selection =
                           || (y == r2 && x <= c2)
           (bgCol', fgCol') = if selected then (fgCol, bgCol) else (bgCol, fgCol)
           ch = character tc
-          (glyphUV, glyphPos) = glyphInfo ch
+          (glyphUV, glyphPos)
+            | ch == '\0', x > 1 =
+                -- ワイド文字の継続セル: 前セルのグリフの右半分を描画
+                let prevCh = character (lookupCell (y, x - 1))
+                in case Map.lookup prevCh (fiGlyphs fi) of
+                  Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
+                  Just gr ->
+                    let gm = grMetrics gr
+                        cw' = cellWidth fi
+                    in ( V4 (grU0 gr) (grV0 gr) (grU1 gr) (grV1 gr)
+                       , V4 (fromIntegral (gmBearingX gm) - cw')
+                            (asc - fromIntegral (gmBearingY gm))
+                            (fromIntegral (gmWidth gm))
+                            (fromIntegral (gmHeight gm))
+                       )
+            | otherwise = glyphInfo ch
       in (bgCol', fgCol', glyphUV, glyphPos)
 
     glyphInfo ' ' = (V4 0 0 0 0, V4 0 0 0 0)
-    glyphInfo ch  = case Map.lookup ch (faGlyphs atlas) of
+    glyphInfo ch  = case Map.lookup ch (fiGlyphs fi) of
       Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
       Just gr ->
         let gm = grMetrics gr
@@ -423,17 +515,17 @@ buildCellData atlas term colorFn scrollOffset selection =
 
 -- | カーソル矩形の頂点。
 buildCursorVertices
-  :: FontAtlas
+  :: FontInfo
   -> Terminal
   -> V4 Float
   -> [(V2 Float, V4 Float, V2 Float)]
-buildCursorVertices atlas term cursorCol =
+buildCursorVertices fi term cursorCol =
   if not (optionShowCursor term)
     then []
     else
       let (cy, cx) = cursorPos term
-          cw = cellWidth atlas
-          fh = fromIntegral (faLineH atlas) :: Float
+          cw = cellWidth fi
+          fh = fromIntegral (fiLineH fi) :: Float
           x0 = fromIntegral (cx - 1) * cw
           y0 = fromIntegral (cy - 1) * fh
           x1 = x0 + cw

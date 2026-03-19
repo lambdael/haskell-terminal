@@ -34,8 +34,8 @@
     "gpipe-freetype-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1773443670,
-        "narHash": "sha256-aSpLSpkpn3C7n8z/wJH6CauBMrkFijiS7AxXJLEysoQ=",
+        "lastModified": 1773819429,
+        "narHash": "sha256-s5MCZEYUgcRikL1bG/hHRQYfvACc+WLLsEixdL5GsMw=",
         "path": "/mnt/share/gpipe-freetype",
         "type": "path"
       },
