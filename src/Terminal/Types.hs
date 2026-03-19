@@ -61,17 +61,35 @@ isWideChar c = let cp = ord c in
   -- Fullwidth Forms
   || (cp >= 0xFF01  && cp <= 0xFF60)
   || (cp >= 0xFFE0  && cp <= 0xFFE6)
+  -- Enclosed Alphanumerics (①-⑳ etc.)
+  || (cp >= 0x2460  && cp <= 0x24FF)
+  -- Enclosed CJK Letters and Months (㈠-㈩, ㊀-㊉ etc.)
+  || (cp >= 0x3200  && cp <= 0x32FF)
+  -- Enclosed Ideographic Supplement (🈁-🈺 etc.)
+  || (cp >= 0x1F200 && cp <= 0x1F2FF)
+  -- Box Drawing (ambiguous but commonly wide in CJK terminals)
+  -- || (cp >= 0x2500  && cp <= 0x257F)
+  -- Miscellaneous Symbols (★☆♠♣♥♦ etc.)
+  || (cp >= 0x2600  && cp <= 0x26FF)
+  -- Dingbats
+  || (cp >= 0x2700  && cp <= 0x27BF)
+  -- Geometric Shapes (■□▲△ etc.)
+  || (cp >= 0x25A0  && cp <= 0x25FF)
+  -- Arrows (→←↑↓ etc.)
+  || (cp >= 0x2190  && cp <= 0x21FF)
+  -- Miscellaneous Technical
+  || (cp >= 0x2300  && cp <= 0x23FF)
 
 -- | ターミナル画面の1セルを表す。
 -- 文字そのものに加え、前景色・背景色・表示属性を保持する。
 data TerminalChar = TerminalChar {
-    character :: Char,              -- ^ 表示文字
-    foregroundColor :: TerminalColor, -- ^ 前景色
-    backgroundColor :: TerminalColor, -- ^ 背景色
-    isBright :: Bool,               -- ^ ボールド/ブライト属性
-    isUnderlined :: Bool,           -- ^ 下線属性
-    isBlinking :: Bool,             -- ^ 点滅属性
-    isInverse :: Bool               -- ^ 反転属性
+    character :: !Char,              -- ^ 表示文字
+    foregroundColor :: !TerminalColor, -- ^ 前景色
+    backgroundColor :: !TerminalColor, -- ^ 背景色
+    isBright :: !Bool,               -- ^ ボールド/ブライト属性
+    isUnderlined :: !Bool,           -- ^ 下線属性
+    isBlinking :: !Bool,             -- ^ 点滅属性
+    isInverse :: !Bool               -- ^ 反転属性
 } deriving (Show, Generic)
 
 -- | 'ScreenIndex' でインデックスされる配列。
@@ -98,27 +116,27 @@ data AltScreenState = AltScreenState
 -- 画面バッファ（'DiffArray' ベース）、カーソル位置、現在の描画属性、
 -- スクロール領域、入力バッファ、terminfo ハンドルなどを含む。
 data Terminal = Terminal {
-    cursorPos :: ScreenIndex,         -- ^ 現在のカーソル位置 @(行, 列)@
-    screen :: TerminalScreen,         -- ^ 画面バッファ
+    cursorPos :: !ScreenIndex,         -- ^ 現在のカーソル位置 @(行, 列)@
+    screen :: !TerminalScreen,         -- ^ 画面バッファ
     inBuffer :: String,               -- ^ パース途中の入力バッファ
     responseBuffer :: String,         -- ^ ターミナルからの応答バッファ
     terminalTitle :: String,          -- ^ ウィンドウタイトル
-    scrollingRegion :: (Int, Int),    -- ^ スクロール領域 @(開始行, 終了行)@
-    rows :: Int,                      -- ^ ターミナルの行数
-    cols :: Int,                      -- ^ ターミナルの列数
-    currentForeground :: TerminalColor, -- ^ 現在の前景色
-    currentBackground :: TerminalColor, -- ^ 現在の背景色
+    scrollingRegion :: !(Int, Int),    -- ^ スクロール領域 @(開始行, 終了行)@
+    rows :: !Int,                      -- ^ ターミナルの行数
+    cols :: !Int,                      -- ^ ターミナルの列数
+    currentForeground :: !TerminalColor, -- ^ 現在の前景色
+    currentBackground :: !TerminalColor, -- ^ 現在の背景色
     terminfo :: Maybe TI.Terminal,    -- ^ terminfo ハンドル（GUI使用時は 'Just'、テスト時は 'Nothing'）
-    optionShowCursor :: Bool,         -- ^ カーソル表示フラグ
-    optionBright :: Bool,             -- ^ ブライト/ボールド属性
-    optionUnderlined :: Bool,         -- ^ 下線属性
-    optionInverse :: Bool,            -- ^ 反転属性
-    optionBlinking :: Bool,           -- ^ 点滅属性
-    mouseMode :: MouseMode,           -- ^ マウストラッキングモード
-    mouseEncoding :: MouseEncoding,   -- ^ マウスイベントのエンコーディング
-    pendingWrap :: Bool,              -- ^ 行末で次の文字入力まで折り返しを保留するフラグ (DECAWM)
+    optionShowCursor :: !Bool,         -- ^ カーソル表示フラグ
+    optionBright :: !Bool,             -- ^ ブライト/ボールド属性
+    optionUnderlined :: !Bool,         -- ^ 下線属性
+    optionInverse :: !Bool,            -- ^ 反転属性
+    optionBlinking :: !Bool,           -- ^ 点滅属性
+    mouseMode :: !MouseMode,           -- ^ マウストラッキングモード
+    mouseEncoding :: !MouseEncoding,   -- ^ マウスイベントのエンコーディング
+    pendingWrap :: !Bool,              -- ^ 行末で次の文字入力まで折り返しを保留するフラグ (DECAWM)
     scrollbackBuffer :: Seq ScrollbackLine, -- ^ スクロールバック履歴
-    scrollbackMax :: Int,             -- ^ スクロールバックの最大行数
+    scrollbackMax :: !Int,             -- ^ スクロールバックの最大行数
     altScreen :: Maybe AltScreenState, -- ^ 代替画面バッファ（'Just' なら代替画面中）
     savedCursor :: Maybe ScreenIndex  -- ^ DECSC で保存したカーソル位置
 }

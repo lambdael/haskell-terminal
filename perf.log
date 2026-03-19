@@ -1,0 +1,1729 @@
+warning: Git tree '/mnt/share/haskell-terminal' is dirty
+Configuration '/home/akk/.config/haskell-terminal/haskell-terminal.hs' changed. Recompiling.
+Program reconfiguration successful.
+Launching custom binary /home/akk/.cache/haskell-terminal/haskell-terminal-linux-x86_64
+
+PERF: glyph=297us cell+tex=34218us
+FRAME: total=35664us render=34914us swap=750us
+PERF: glyph=111us cell+tex=20609us
+FRAME: total=29298us render=28748us swap=550us
+PERF: glyph=133us cell+tex=20650us
+FRAME: total=21285us render=21102us swap=183us
+PERF: glyph=144us cell+tex=21536us
+FRAME: total=22197us render=21892us swap=305us
+PERF: glyph=115us cell+tex=20582us
+FRAME: total=21332us render=20956us swap=376us
+PERF: glyph=107us cell+tex=20261us
+FRAME: total=20872us render=20554us swap=318us
+PERF: glyph=180us cell+tex=20626us
+FRAME: total=21205us render=21053us swap=152us
+PERF: glyph=108us cell+tex=20435us
+FRAME: total=21119us render=20788us swap=331us
+PERF: glyph=111us cell+tex=20507us
+FRAME: total=21235us render=20874us swap=361us
+PERF: glyph=125us cell+tex=21363us
+FRAME: total=22109us render=21740us swap=369us
+PERF: glyph=98us cell+tex=20455us
+FRAME: total=21172us render=20822us swap=350us
+PERF: glyph=311us cell+tex=22370us
+FRAME: total=23214us render=22931us swap=283us
+PERF: glyph=131us cell+tex=39042us
+FRAME: total=39823us render=39453us swap=370us
+PERF: glyph=208us cell+tex=20508us
+FRAME: total=21088us render=20957us swap=131us
+PERF: glyph=155us cell+tex=21176us
+FRAME: total=21850us render=21545us swap=305us
+PERF: glyph=129us cell+tex=20983us
+FRAME: total=21620us render=21321us swap=299us
+PERF: glyph=122us cell+tex=20707us
+FRAME: total=21358us render=21050us swap=308us
+PERF: glyph=123us cell+tex=20497us
+FRAME: total=21056us render=20891us swap=165us
+PERF: glyph=132us cell+tex=20463us
+FRAME: total=20915us render=20800us swap=115us
+PERF: glyph=123us cell+tex=20604us
+FRAME: total=21182us render=20926us swap=256us
+PERF: glyph=279us cell+tex=20795us
+FRAME: total=21740us render=21366us swap=374us
+PERF: glyph=122us cell+tex=20508us
+FRAME: total=21061us render=20896us swap=165us
+PERF: glyph=131us cell+tex=20411us
+FRAME: total=20880us render=20751us swap=129us
+PERF: glyph=132us cell+tex=21302us
+FRAME: total=21938us render=21628us swap=310us
+PERF: glyph=131us cell+tex=20832us
+FRAME: total=21595us render=21232us swap=363us
+PERF: glyph=125us cell+tex=20504us
+FRAME: total=20985us render=20855us swap=130us
+PERF: glyph=118us cell+tex=20478us
+FRAME: total=20928us render=20802us swap=126us
+PERF: glyph=215us cell+tex=20694us
+FRAME: total=21627us render=21162us swap=465us
+PERF: glyph=137us cell+tex=21830us
+FRAME: total=22514us render=22185us swap=329us
+PERF: glyph=121us cell+tex=20862us
+FRAME: total=21386us render=21243us swap=143us
+PERF: glyph=125us cell+tex=20685us
+FRAME: total=21325us render=21038us swap=287us
+PERF: glyph=136us cell+tex=20655us
+FRAME: total=21291us render=21001us swap=290us
+PERF: glyph=159us cell+tex=20813us
+FRAME: total=21616us render=21274us swap=342us
+PERF: glyph=136us cell+tex=20757us
+FRAME: total=21245us render=21132us swap=113us
+PERF: glyph=302us cell+tex=20629us
+FRAME: total=21476us render=21177us swap=299us
+PERF: glyph=156us cell+tex=20465us
+FRAME: total=21240us render=20901us swap=339us
+PERF: glyph=102us cell+tex=20459us
+FRAME: total=21157us render=20811us swap=346us
+PERF: glyph=135us cell+tex=21209us
+FRAME: total=22087us render=21579us swap=508us
+PERF: glyph=109us cell+tex=20456us
+FRAME: total=21297us render=20797us swap=500us
+PERF: glyph=184us cell+tex=23087us
+FRAME: total=24345us render=23516us swap=829us
+PERF: glyph=262us cell+tex=23175us
+FRAME: total=23756us render=23653us swap=103us
+PERF: glyph=174us cell+tex=20356us
+FRAME: total=21208us render=20770us swap=438us
+PERF: glyph=106us cell+tex=20841us
+FRAME: total=21821us render=21180us swap=641us
+PERF: glyph=189us cell+tex=20902us
+FRAME: total=21880us render=21346us swap=534us
+PERF: glyph=115us cell+tex=20705us
+FRAME: total=21385us render=21050us swap=335us
+PERF: glyph=123us cell+tex=21031us
+FRAME: total=21970us render=21408us swap=562us
+PERF: glyph=105us cell+tex=20799us
+FRAME: total=21547us render=21120us swap=427us
+PERF: glyph=110us cell+tex=20405us
+FRAME: total=21038us render=20742us swap=296us
+PERF: glyph=161us cell+tex=20358us
+FRAME: total=21049us render=20738us swap=311us
+PERF: glyph=115us cell+tex=20903us
+FRAME: total=21619us render=21279us swap=340us
+PERF: glyph=98us cell+tex=20754us
+FRAME: total=21420us render=21092us swap=328us
+PERF: glyph=112us cell+tex=20379us
+FRAME: total=21073us render=20730us swap=343us
+PERF: glyph=113us cell+tex=20362us
+FRAME: total=21265us render=20710us swap=555us
+PERF: glyph=104us cell+tex=21405us
+FRAME: total=22290us render=21738us swap=552us
+PERF: glyph=114us cell+tex=20493us
+FRAME: total=21165us render=20842us swap=323us
+PERF: glyph=258us cell+tex=21314us
+FRAME: total=22155us render=21807us swap=348us
+PERF: glyph=107us cell+tex=20699us
+FRAME: total=21513us render=21024us swap=489us
+PERF: glyph=105us cell+tex=20592us
+FRAME: total=21455us render=20955us swap=500us
+PERF: glyph=144us cell+tex=21163us
+FRAME: total=21860us render=21535us swap=325us
+PERF: glyph=98us cell+tex=20372us
+FRAME: total=20992us render=20688us swap=304us
+PERF: glyph=104us cell+tex=20317us
+FRAME: total=20952us render=20639us swap=313us
+PERF: glyph=106us cell+tex=20881us
+FRAME: total=21547us render=21219us swap=328us
+PERF: glyph=184us cell+tex=20470us
+FRAME: total=21192us render=20868us swap=324us
+PERF: glyph=108us cell+tex=20345us
+FRAME: total=20982us render=20663us swap=319us
+PERF: glyph=112us cell+tex=20520us
+FRAME: total=21186us render=20858us swap=328us
+PERF: glyph=111us cell+tex=21013us
+FRAME: total=21692us render=21365us swap=327us
+PERF: glyph=99us cell+tex=20350us
+FRAME: total=21004us render=20677us swap=327us
+PERF: glyph=136us cell+tex=20465us
+FRAME: total=21180us render=20876us swap=304us
+PERF: glyph=108us cell+tex=21603us
+FRAME: total=22267us render=21946us swap=321us
+PERF: glyph=213us cell+tex=22107us
+FRAME: total=22813us render=22512us swap=301us
+PERF: glyph=104us cell+tex=20504us
+FRAME: total=21088us render=20794us swap=294us
+PERF: glyph=188us cell+tex=20662us
+FRAME: total=21462us render=21135us swap=327us
+PERF: glyph=99us cell+tex=20574us
+FRAME: total=21223us render=20897us swap=326us
+PERF: glyph=147us cell+tex=20993us
+FRAME: total=21663us render=21357us swap=306us
+PERF: glyph=104us cell+tex=20491us
+FRAME: total=21163us render=20834us swap=329us
+PERF: glyph=141us cell+tex=20828us
+FRAME: total=21604us render=21232us swap=372us
+PERF: glyph=214us cell+tex=20661us
+FRAME: total=21471us render=21110us swap=361us
+PERF: glyph=108us cell+tex=20350us
+FRAME: total=20991us render=20683us swap=308us
+PERF: glyph=116us cell+tex=20401us
+FRAME: total=21285us render=20766us swap=519us
+PERF: glyph=131us cell+tex=21878us
+FRAME: total=22874us render=22255us swap=619us
+PERF: glyph=114us cell+tex=20400us
+FRAME: total=21024us render=20718us swap=306us
+PERF: glyph=114us cell+tex=20460us
+FRAME: total=21410us render=20805us swap=605us
+PERF: glyph=113us cell+tex=20891us
+FRAME: total=21710us render=21287us swap=423us
+PERF: glyph=177us cell+tex=21251us
+FRAME: total=21908us render=21611us swap=297us
+PERF: glyph=104us cell+tex=20653us
+FRAME: total=21535us render=20961us swap=574us
+PERF: glyph=99us cell+tex=20636us
+FRAME: total=21647us render=20981us swap=666us
+PERF: glyph=103us cell+tex=20440us
+FRAME: total=21071us render=20757us swap=314us
+PERF: glyph=107us cell+tex=20430us
+FRAME: total=21100us render=20771us swap=329us
+PERF: glyph=121us cell+tex=20854us
+FRAME: total=21703us render=21174us swap=529us
+PERF: glyph=110us cell+tex=20714us
+FRAME: total=21710us render=21070us swap=640us
+PERF: glyph=178us cell+tex=20405us
+FRAME: total=21124us render=20821us swap=303us
+PERF: glyph=131us cell+tex=20499us
+FRAME: total=21194us render=20890us swap=304us
+PERF: glyph=113us cell+tex=20562us
+FRAME: total=21266us render=20919us swap=347us
+PERF: glyph=114us cell+tex=21148us
+FRAME: total=21796us render=21477us swap=319us
+PERF: glyph=102us cell+tex=20390us
+FRAME: total=21058us render=20736us swap=322us
+PERF: glyph=99us cell+tex=20340us
+FRAME: total=20923us render=20632us swap=291us
+PERF: glyph=99us cell+tex=20549us
+FRAME: total=21465us render=20867us swap=598us
+PERF: glyph=180us cell+tex=20930us
+FRAME: total=21942us render=21405us swap=537us
+PERF: glyph=146us cell+tex=20530us
+FRAME: total=21292us render=20967us swap=325us
+PERF: glyph=101us cell+tex=20449us
+FRAME: total=21192us render=20774us swap=418us
+PERF: glyph=110us cell+tex=20505us
+FRAME: total=21252us render=20835us swap=417us
+PERF: glyph=104us cell+tex=21041us
+FRAME: total=21745us render=21407us swap=338us
+PERF: glyph=117us cell+tex=20500us
+FRAME: total=21219us render=20868us swap=351us
+PERF: glyph=158us cell+tex=20512us
+FRAME: total=21295us render=20961us swap=334us
+PERF: glyph=186us cell+tex=20488us
+FRAME: total=21286us render=20940us swap=346us
+PERF: glyph=119us cell+tex=21539us
+FRAME: total=22327us render=21883us swap=444us
+PERF: glyph=106us cell+tex=20504us
+FRAME: total=21280us render=20879us swap=401us
+PERF: glyph=105us cell+tex=20314us
+FRAME: total=21088us render=20658us swap=430us
+PERF: glyph=105us cell+tex=20400us
+FRAME: total=21114us render=20721us swap=393us
+PERF: glyph=129us cell+tex=21159us
+FRAME: total=21975us render=21545us swap=430us
+PERF: glyph=128us cell+tex=21459us
+FRAME: total=22083us render=21797us swap=286us
+PERF: glyph=121us cell+tex=20480us
+FRAME: total=21215us render=20834us swap=381us
+PERF: glyph=218us cell+tex=20689us
+FRAME: total=21468us render=21136us swap=332us
+PERF: glyph=112us cell+tex=20405us
+FRAME: total=21148us render=20759us swap=389us
+PERF: glyph=118us cell+tex=20639us
+FRAME: total=21422us render=21039us swap=383us
+PERF: glyph=147us cell+tex=20719us
+FRAME: total=21427us render=21090us swap=337us
+PERF: glyph=161us cell+tex=20650us
+FRAME: total=21350us render=21037us swap=313us
+PERF: glyph=205us cell+tex=20440us
+FRAME: total=21205us render=20874us swap=331us
+PERF: glyph=156us cell+tex=20618us
+FRAME: total=21394us render=21057us swap=337us
+PERF: glyph=126us cell+tex=21278us
+FRAME: total=22009us render=21666us swap=343us
+PERF: glyph=128us cell+tex=20452us
+FRAME: total=21171us render=20834us swap=337us
+PERF: glyph=133us cell+tex=20370us
+FRAME: total=21090us render=20759us swap=331us
+PERF: glyph=274us cell+tex=20708us
+FRAME: total=21544us render=21227us swap=317us
+PERF: glyph=199us cell+tex=20287us
+FRAME: total=21030us render=20708us swap=322us
+PERF: glyph=128us cell+tex=20851us
+FRAME: total=21494us render=21183us swap=311us
+PERF: glyph=169us cell+tex=21493us
+FRAME: total=22323us render=21945us swap=378us
+PERF: glyph=133us cell+tex=21611us
+FRAME: total=22286us render=21957us swap=329us
+PERF: glyph=118us cell+tex=20981us
+FRAME: total=21647us render=21318us swap=329us
+PERF: glyph=212us cell+tex=20953us
+FRAME: total=21668us render=21367us swap=301us
+PERF: glyph=126us cell+tex=20423us
+FRAME: total=21088us render=20767us swap=321us
+PERF: glyph=139us cell+tex=20473us
+FRAME: total=21197us render=20869us swap=328us
+PERF: glyph=126us cell+tex=20913us
+FRAME: total=21617us render=21289us swap=328us
+PERF: glyph=127us cell+tex=20586us
+FRAME: total=21300us render=20964us swap=336us
+PERF: glyph=209us cell+tex=20406us
+FRAME: total=21268us render=20938us swap=330us
+PERF: glyph=157us cell+tex=20392us
+FRAME: total=21157us render=20829us swap=328us
+PERF: glyph=197us cell+tex=20910us
+FRAME: total=21705us render=21354us swap=351us
+PERF: glyph=116us cell+tex=20862us
+FRAME: total=21557us render=21214us swap=343us
+PERF: glyph=120us cell+tex=21080us
+FRAME: total=21698us render=21402us swap=296us
+PERF: glyph=126us cell+tex=20375us
+FRAME: total=21044us render=20720us swap=324us
+PERF: glyph=219us cell+tex=21140us
+FRAME: total=21919us render=21596us swap=323us
+PERF: glyph=130us cell+tex=20470us
+FRAME: total=21137us render=20815us swap=322us
+PERF: glyph=126us cell+tex=20493us
+FRAME: total=21204us render=20874us swap=330us
+PERF: glyph=171us cell+tex=21417us
+FRAME: total=22151us render=21841us swap=310us
+PERF: glyph=130us cell+tex=20424us
+FRAME: total=21119us render=20792us swap=327us
+PERF: glyph=230us cell+tex=20739us
+FRAME: total=21577us render=21238us swap=339us
+PERF: glyph=124us cell+tex=20935us
+FRAME: total=21621us render=21294us swap=327us
+PERF: glyph=119us cell+tex=21018us
+FRAME: total=21718us render=21390us swap=328us
+PERF: glyph=149us cell+tex=20381us
+FRAME: total=21084us render=20754us swap=330us
+PERF: glyph=119us cell+tex=20453us
+FRAME: total=21154us render=20827us swap=327us
+PERF: glyph=122us cell+tex=20557us
+FRAME: total=21254us render=20908us swap=346us
+PERF: glyph=224us cell+tex=20506us
+FRAME: total=21420us render=20966us swap=454us
+PERF: glyph=133us cell+tex=20935us
+FRAME: total=21757us render=21316us swap=441us
+PERF: glyph=126us cell+tex=21463us
+FRAME: total=22175us render=21838us swap=337us
+PERF: glyph=130us cell+tex=20845us
+FRAME: total=21616us render=21209us swap=407us
+PERF: glyph=135us cell+tex=20488us
+FRAME: total=21271us render=20875us swap=396us
+PERF: glyph=211us cell+tex=20487us
+FRAME: total=21304us render=20959us swap=345us
+PERF: glyph=126us cell+tex=21513us
+FRAME: total=22220us render=21877us swap=343us
+PERF: glyph=132us cell+tex=20417us
+FRAME: total=21143us render=20798us swap=345us
+PERF: glyph=156us cell+tex=20736us
+FRAME: total=21552us render=21186us swap=366us
+PERF: glyph=120us cell+tex=20449us
+FRAME: total=21145us render=20814us swap=331us
+PERF: glyph=243us cell+tex=20720us
+FRAME: total=21519us render=21201us swap=318us
+PERF: glyph=275us cell+tex=20264us
+FRAME: total=21095us render=20771us swap=324us
+PERF: glyph=127us cell+tex=20514us
+FRAME: total=21328us render=20886us swap=442us
+PERF: glyph=122us cell+tex=21864us
+FRAME: total=22856us render=22245us swap=611us
+PERF: glyph=177us cell+tex=21289us
+FRAME: total=21901us render=21639us swap=262us
+PERF: glyph=146us cell+tex=20642us
+FRAME: total=21498us render=21079us swap=419us
+PERF: glyph=289us cell+tex=20697us
+FRAME: total=21828us render=21217us swap=611us
+PERF: glyph=416us cell+tex=29361us
+FRAME: total=30457us render=30096us swap=361us
+PERF: glyph=118us cell+tex=21069us
+FRAME: total=21754us render=21420us swap=334us
+PERF: glyph=118us cell+tex=20391us
+FRAME: total=21079us render=20750us swap=329us
+PERF: glyph=138us cell+tex=20411us
+FRAME: total=21133us render=20796us swap=337us
+PERF: glyph=290us cell+tex=20848us
+FRAME: total=21796us render=21463us swap=333us
+PERF: glyph=120us cell+tex=21046us
+FRAME: total=21734us render=21396us swap=338us
+PERF: glyph=122us cell+tex=20715us
+FRAME: total=21411us render=21076us swap=335us
+PERF: glyph=117us cell+tex=20467us
+FRAME: total=21123us render=20810us swap=313us
+PERF: glyph=136us cell+tex=20456us
+FRAME: total=21154us render=20829us swap=325us
+PERF: glyph=116us cell+tex=21292us
+FRAME: total=22003us render=21640us swap=363us
+PERF: glyph=204us cell+tex=21438us
+FRAME: total=22303us render=21845us swap=458us
+PERF: glyph=379us cell+tex=27066us
+FRAME: total=28048us render=27719us swap=329us
+PERF: glyph=125us cell+tex=21443us
+FRAME: total=22146us render=21800us swap=346us
+PERF: glyph=124us cell+tex=20410us
+FRAME: total=21363us render=20741us swap=622us
+PERF: glyph=436us cell+tex=23075us
+FRAME: total=24183us render=23733us swap=450us
+PERF: glyph=206us cell+tex=20376us
+FRAME: total=21156us render=20816us swap=340us
+PERF: glyph=114us cell+tex=20285us
+FRAME: total=20942us render=20631us swap=311us
+PERF: glyph=126us cell+tex=20901us
+FRAME: total=21553us render=21244us swap=309us
+PERF: glyph=125us cell+tex=20626us
+FRAME: total=21342us render=21013us swap=329us
+PERF: glyph=165us cell+tex=20401us
+FRAME: total=21205us render=20784us swap=421us
+PERF: glyph=119us cell+tex=20331us
+FRAME: total=21027us render=20702us swap=325us
+PERF: glyph=249us cell+tex=20878us
+FRAME: total=21679us render=21362us swap=317us
+PERF: glyph=111us cell+tex=20480us
+FRAME: total=21250us render=20852us swap=398us
+PERF: glyph=119us cell+tex=20403us
+FRAME: total=21082us render=20756us swap=326us
+PERF: glyph=122us cell+tex=21459us
+FRAME: total=22047us render=21763us swap=284us
+PERF: glyph=117us cell+tex=20386us
+FRAME: total=21102us render=20761us swap=341us
+PERF: glyph=207us cell+tex=20458us
+FRAME: total=21555us render=20916us swap=639us
+PERF: glyph=126us cell+tex=20533us
+FRAME: total=21187us render=20873us swap=314us
+PERF: glyph=164us cell+tex=20952us
+FRAME: total=21722us render=21368us swap=354us
+PERF: glyph=137us cell+tex=20550us
+FRAME: total=35873us render=35380us swap=493us
+PERF: glyph=147us cell+tex=20599us
+FRAME: total=21367us render=21020us swap=347us
+PERF: glyph=210us cell+tex=22261us
+FRAME: total=23054us render=22711us swap=343us
+PERF: glyph=170us cell+tex=20807us
+FRAME: total=21615us render=21212us swap=403us
+PERF: glyph=139us cell+tex=21074us
+FRAME: total=21803us render=21597us swap=206us
+PERF: glyph=156us cell+tex=21278us
+FRAME: total=22069us render=21709us swap=360us
+PERF: glyph=329us cell+tex=20559us
+FRAME: total=21448us render=21111us swap=337us
+PERF: glyph=140us cell+tex=21321us
+FRAME: total=21897us render=21623us swap=274us
+PERF: glyph=211us cell+tex=21564us
+FRAME: total=22350us render=22019us swap=331us
+PERF: glyph=136us cell+tex=21106us
+FRAME: total=21816us render=21484us swap=332us
+PERF: glyph=352us cell+tex=20950us
+FRAME: total=21867us render=21532us swap=335us
+PERF: glyph=140us cell+tex=20653us
+FRAME: total=21402us render=21057us swap=345us
+PERF: glyph=136us cell+tex=20705us
+FRAME: total=21423us render=21087us swap=336us
+PERF: glyph=134us cell+tex=21799us
+FRAME: total=22429us render=22121us swap=308us
+PERF: glyph=220us cell+tex=21092us
+FRAME: total=21957us render=21613us swap=344us
+PERF: glyph=142us cell+tex=20611us
+FRAME: total=21308us render=20979us swap=329us
+PERF: glyph=132us cell+tex=20723us
+FRAME: total=21399us render=21073us swap=326us
+PERF: glyph=302us cell+tex=21411us
+FRAME: total=22254us render=21930us swap=324us
+PERF: glyph=166us cell+tex=21083us
+FRAME: total=21803us render=21479us swap=324us
+PERF: glyph=138us cell+tex=21244us
+FRAME: total=21817us render=21540us swap=277us
+PERF: glyph=142us cell+tex=20547us
+FRAME: total=21249us render=20921us swap=328us
+PERF: glyph=333us cell+tex=21252us
+FRAME: total=22133us render=21808us swap=325us
+PERF: glyph=135us cell+tex=20618us
+FRAME: total=21276us render=20959us swap=317us
+PERF: glyph=144us cell+tex=21020us
+FRAME: total=21751us render=21417us swap=334us
+PERF: glyph=134us cell+tex=20701us
+FRAME: total=21391us render=21060us swap=331us
+PERF: glyph=306us cell+tex=20480us
+FRAME: total=21337us render=21014us swap=323us
+PERF: glyph=142us cell+tex=20467us
+FRAME: total=21143us render=20826us swap=317us
+PERF: glyph=130us cell+tex=20833us
+FRAME: total=21394us render=21243us swap=151us
+PERF: glyph=279us cell+tex=21262us
+FRAME: total=22158us render=21765us swap=393us
+PERF: glyph=132us cell+tex=21069us
+FRAME: total=21676us render=21389us swap=287us
+PERF: glyph=157us cell+tex=20545us
+FRAME: total=21262us render=20939us swap=323us
+PERF: glyph=130us cell+tex=21378us
+FRAME: total=22141us render=21740us swap=401us
+PERF: glyph=328us cell+tex=20783us
+FRAME: total=21654us render=21331us swap=323us
+PERF: glyph=128us cell+tex=23423us
+FRAME: total=24118us render=23785us swap=333us
+PERF: glyph=145us cell+tex=20507us
+FRAME: total=21217us render=20883us swap=334us
+PERF: glyph=134us cell+tex=21427us
+FRAME: total=22103us render=21780us swap=323us
+PERF: glyph=307us cell+tex=20582us
+FRAME: total=21462us render=21141us swap=321us
+PERF: glyph=129us cell+tex=20482us
+FRAME: total=21176us render=20845us swap=331us
+PERF: glyph=133us cell+tex=20877us
+FRAME: total=21578us render=21249us swap=329us
+PERF: glyph=170us cell+tex=20538us
+FRAME: total=21255us render=20935us swap=320us
+PERF: glyph=502us cell+tex=20460us
+FRAME: total=21564us render=21243us swap=321us
+PERF: glyph=140us cell+tex=21445us
+FRAME: total=22172us render=21829us swap=343us
+PERF: glyph=154us cell+tex=21180us
+FRAME: total=21828us render=21522us swap=306us
+PERF: glyph=156us cell+tex=20698us
+FRAME: total=21694us render=21118us swap=576us
+PERF: glyph=352us cell+tex=20885us
+FRAME: total=21837us render=21502us swap=335us
+PERF: glyph=205us cell+tex=20853us
+FRAME: total=21611us render=21280us swap=331us
+PERF: glyph=134us cell+tex=20857us
+FRAME: total=21615us render=21236us swap=379us
+PERF: glyph=379us cell+tex=20555us
+FRAME: total=21329us render=21187us swap=142us
+PERF: glyph=129us cell+tex=20505us
+FRAME: total=21182us render=20860us swap=322us
+PERF: glyph=146us cell+tex=21180us
+FRAME: total=21884us render=21568us swap=316us
+PERF: glyph=177us cell+tex=20685us
+FRAME: total=21547us render=21140us swap=407us
+PERF: glyph=492us cell+tex=20600us
+FRAME: total=21605us render=21308us swap=297us
+PERF: glyph=470us cell+tex=26479us
+FRAME: total=27727us render=27228us swap=499us
+PERF: glyph=140us cell+tex=20934us
+FRAME: total=21398us render=21277us swap=121us
+PERF: glyph=154us cell+tex=22008us
+FRAME: total=22747us render=22419us swap=328us
+PERF: glyph=350us cell+tex=20695us
+FRAME: total=21585us render=21259us swap=326us
+PERF: glyph=142us cell+tex=20611us
+FRAME: total=21274us render=20953us swap=321us
+PERF: glyph=136us cell+tex=20562us
+FRAME: total=21240us render=20923us swap=317us
+PERF: glyph=158us cell+tex=21289us
+FRAME: total=22057us render=21713us swap=344us
+PERF: glyph=135us cell+tex=21004us
+FRAME: total=21691us render=21364us swap=327us
+PERF: glyph=136us cell+tex=20934us
+FRAME: total=21660us render=21334us swap=326us
+PERF: glyph=136us cell+tex=20689us
+FRAME: total=21445us render=21074us swap=371us
+PERF: glyph=337us cell+tex=20398us
+FRAME: total=21556us render=20966us swap=590us
+PERF: glyph=360us cell+tex=22924us
+FRAME: total=23914us render=23581us swap=333us
+PERF: glyph=137us cell+tex=20598us
+FRAME: total=21343us render=21001us swap=342us
+PERF: glyph=134us cell+tex=21141us
+FRAME: total=22014us render=21469us swap=545us
+PERF: glyph=438us cell+tex=21093us
+FRAME: total=22140us render=21791us swap=349us
+PERF: glyph=140us cell+tex=20959us
+FRAME: total=21699us render=21346us swap=353us
+PERF: glyph=136us cell+tex=20636us
+FRAME: total=21622us render=21022us swap=600us
+PERF: glyph=467us cell+tex=23794us
+FRAME: total=24816us render=24512us swap=304us
+PERF: glyph=376us cell+tex=20734us
+FRAME: total=21781us render=21393us swap=388us
+PERF: glyph=168us cell+tex=21653us
+FRAME: total=22412us render=22080us swap=332us
+PERF: glyph=142us cell+tex=21033us
+FRAME: total=21746us render=21411us swap=335us
+PERF: glyph=178us cell+tex=21210us
+FRAME: total=21986us render=21633us swap=353us
+PERF: glyph=180us cell+tex=20824us
+FRAME: total=21798us render=21251us swap=547us
+PERF: glyph=145us cell+tex=20599us
+FRAME: total=21296us render=20971us swap=325us
+PERF: glyph=136us cell+tex=20500us
+FRAME: total=21250us render=20889us swap=361us
+PERF: glyph=378us cell+tex=21553us
+FRAME: total=22745us render=22172us swap=573us
+PERF: glyph=2735us cell+tex=21095us
+FRAME: total=24288us render=24075us swap=213us
+PERF: glyph=146us cell+tex=20663us
+FRAME: total=21400us render=21056us swap=344us
+PERF: glyph=161us cell+tex=20698us
+FRAME: total=21747us render=21123us swap=624us
+PERF: glyph=135us cell+tex=20486us
+FRAME: total=20980us render=20845us swap=135us
+PERF: glyph=325us cell+tex=20951us
+FRAME: total=21755us render=21476us swap=279us
+PERF: glyph=135us cell+tex=20768us
+FRAME: total=21480us render=21144us swap=336us
+PERF: glyph=130us cell+tex=20756us
+FRAME: total=21502us render=21148us swap=354us
+PERF: glyph=132us cell+tex=21282us
+FRAME: total=21926us render=21642us swap=284us
+PERF: glyph=337us cell+tex=20527us
+FRAME: total=21443us render=21110us swap=333us
+PERF: glyph=146us cell+tex=20654us
+FRAME: total=21358us render=21026us swap=332us
+PERF: glyph=144us cell+tex=21273us
+FRAME: total=22024us render=21682us swap=342us
+PERF: glyph=193us cell+tex=20901us
+FRAME: total=21682us render=21363us swap=319us
+PERF: glyph=138us cell+tex=20721us
+FRAME: total=21434us render=21101us swap=333us
+PERF: glyph=130us cell+tex=20992us
+FRAME: total=21675us render=21348us swap=327us
+PERF: glyph=141us cell+tex=20666us
+FRAME: total=21408us render=21072us swap=336us
+PERF: glyph=346us cell+tex=20656us
+FRAME: total=21605us render=21258us swap=347us
+PERF: glyph=134us cell+tex=20669us
+FRAME: total=21366us render=21038us swap=328us
+PERF: glyph=138us cell+tex=20756us
+FRAME: total=21481us render=21137us swap=344us
+PERF: glyph=139us cell+tex=20683us
+FRAME: total=21405us render=21060us swap=345us
+PERF: glyph=421us cell+tex=20813us
+FRAME: total=21817us render=21487us swap=330us
+PERF: glyph=144us cell+tex=20708us
+FRAME: total=21444us render=21106us swap=338us
+PERF: glyph=138us cell+tex=21227us
+FRAME: total=21836us render=21550us swap=286us
+PERF: glyph=199us cell+tex=21705us
+FRAME: total=22465us render=22131us swap=334us
+PERF: glyph=433us cell+tex=20637us
+FRAME: total=21620us render=21298us swap=322us
+PERF: glyph=185us cell+tex=21009us
+FRAME: total=21870us render=21495us swap=375us
+PERF: glyph=142us cell+tex=20797us
+FRAME: total=21533us render=21196us swap=337us
+PERF: glyph=519us cell+tex=22208us
+FRAME: total=23314us render=22983us swap=331us
+PERF: glyph=138us cell+tex=20611us
+FRAME: total=21313us render=20984us swap=329us
+PERF: glyph=136us cell+tex=20726us
+FRAME: total=21301us render=21135us swap=166us
+PERF: glyph=171us cell+tex=21461us
+FRAME: total=22199us render=21867us swap=332us
+PERF: glyph=383us cell+tex=20523us
+FRAME: total=21463us render=21136us swap=327us
+PERF: glyph=142us cell+tex=20636us
+FRAME: total=21355us render=21017us swap=338us
+PERF: glyph=143us cell+tex=22645us
+FRAME: total=23262us render=22965us swap=297us
+PERF: glyph=139us cell+tex=20707us
+FRAME: total=21394us render=21082us swap=312us
+PERF: glyph=334us cell+tex=20713us
+FRAME: total=21638us render=21296us swap=342us
+PERF: glyph=144us cell+tex=21292us
+FRAME: total=22156us render=21744us swap=412us
+PERF: glyph=138us cell+tex=21316us
+FRAME: total=22077us render=21725us swap=352us
+PERF: glyph=138us cell+tex=20595us
+FRAME: total=21291us render=20968us swap=323us
+PERF: glyph=354us cell+tex=20721us
+FRAME: total=21665us render=21325us swap=340us
+PERF: glyph=137us cell+tex=20841us
+FRAME: total=21586us render=21233us swap=353us
+PERF: glyph=134us cell+tex=20455us
+FRAME: total=21160us render=20839us swap=321us
+PERF: glyph=389us cell+tex=20578us
+FRAME: total=21613us render=21256us swap=357us
+PERF: glyph=134us cell+tex=20851us
+FRAME: total=21540us render=21223us swap=317us
+PERF: glyph=128us cell+tex=20500us
+FRAME: total=21364us render=20854us swap=510us
+PERF: glyph=137us cell+tex=21429us
+FRAME: total=22077us render=21757us swap=320us
+PERF: glyph=362us cell+tex=20794us
+FRAME: total=21911us render=21395us swap=516us
+PERF: glyph=145us cell+tex=20494us
+FRAME: total=21227us render=20890us swap=337us
+PERF: glyph=135us cell+tex=20744us
+FRAME: total=21443us render=21097us swap=346us
+PERF: glyph=384us cell+tex=20807us
+FRAME: total=22059us render=21462us swap=597us
+PERF: glyph=153us cell+tex=21292us
+FRAME: total=21987us render=21676us swap=311us
+PERF: glyph=134us cell+tex=20541us
+FRAME: total=21223us render=20904us swap=319us
+PERF: glyph=147us cell+tex=20752us
+FRAME: total=21553us render=21180us swap=373us
+PERF: glyph=312us cell+tex=20963us
+FRAME: total=21874us render=21542us swap=332us
+PERF: glyph=132us cell+tex=20456us
+FRAME: total=21178us render=20834us swap=344us
+PERF: glyph=136us cell+tex=20529us
+FRAME: total=21254us render=20923us swap=331us
+PERF: glyph=134us cell+tex=20985us
+FRAME: total=21662us render=21394us swap=268us
+PERF: glyph=355us cell+tex=25473us
+FRAME: total=26322us render=26032us swap=290us
+PERF: glyph=147us cell+tex=20588us
+FRAME: total=21360us render=20997us swap=363us
+PERF: glyph=144us cell+tex=21590us
+FRAME: total=22337us render=22004us swap=333us
+PERF: glyph=381us cell+tex=20485us
+FRAME: total=21433us render=21104us swap=329us
+PERF: glyph=142us cell+tex=20496us
+FRAME: total=21241us render=20908us swap=333us
+PERF: glyph=134us cell+tex=20854us
+FRAME: total=21562us render=21223us swap=339us
+PERF: glyph=176us cell+tex=20594us
+FRAME: total=21338us render=21016us swap=322us
+PERF: glyph=346us cell+tex=20444us
+FRAME: total=21353us render=21021us swap=332us
+PERF: glyph=142us cell+tex=20466us
+FRAME: total=21244us render=20856us swap=388us
+PERF: glyph=187us cell+tex=21445us
+FRAME: total=22196us render=21867us swap=329us
+PERF: glyph=148us cell+tex=20557us
+FRAME: total=21358us render=20958us swap=400us
+PERF: glyph=334us cell+tex=21188us
+FRAME: total=21994us render=21702us swap=292us
+PERF: glyph=174us cell+tex=21531us
+FRAME: total=22391us render=22027us swap=364us
+PERF: glyph=136us cell+tex=20491us
+FRAME: total=21193us render=20858us swap=335us
+PERF: glyph=399us cell+tex=20563us
+FRAME: total=21552us render=21216us swap=336us
+PERF: glyph=139us cell+tex=21140us
+FRAME: total=21825us render=21503us swap=322us
+PERF: glyph=135us cell+tex=20566us
+FRAME: total=21279us render=20957us swap=322us
+PERF: glyph=133us cell+tex=20699us
+FRAME: total=21383us render=21065us swap=318us
+PERF: glyph=327us cell+tex=20502us
+FRAME: total=21421us render=21086us swap=335us
+PERF: glyph=133us cell+tex=20496us
+FRAME: total=21168us render=20852us swap=316us
+PERF: glyph=130us cell+tex=20878us
+FRAME: total=21570us render=21240us swap=330us
+PERF: glyph=129us cell+tex=20547us
+FRAME: total=21278us render=20938us swap=340us
+PERF: glyph=446us cell+tex=20500us
+FRAME: total=21490us render=21170us swap=320us
+PERF: glyph=146us cell+tex=21802us
+FRAME: total=22541us render=22195us swap=346us
+PERF: glyph=145us cell+tex=20679us
+FRAME: total=21311us render=21019us swap=292us
+PERF: glyph=134us cell+tex=20647us
+FRAME: total=21392us render=21041us swap=351us
+PERF: glyph=158us cell+tex=20515us
+FRAME: total=21277us render=20935us swap=342us
+PERF: glyph=146us cell+tex=24796us
+FRAME: total=25395us render=25112us swap=283us
+PERF: glyph=140us cell+tex=20902us
+FRAME: total=21690us render=21319us swap=371us
+PERF: glyph=347us cell+tex=20563us
+FRAME: total=21524us render=21151us swap=373us
+PERF: glyph=142us cell+tex=20748us
+FRAME: total=21765us render=21140us swap=625us
+PERF: glyph=184us cell+tex=20880us
+FRAME: total=21620us render=21294us swap=326us
+PERF: glyph=159us cell+tex=20818us
+FRAME: total=21768us render=21201us swap=567us
+PERF: glyph=193us cell+tex=20320us
+FRAME: total=21370us render=20752us swap=618us
+PERF: glyph=142us cell+tex=21292us
+FRAME: total=22049us render=21696us swap=353us
+PERF: glyph=140us cell+tex=21285us
+FRAME: total=22022us render=21663us swap=359us
+PERF: glyph=191us cell+tex=20548us
+FRAME: total=21557us render=20984us swap=573us
+PERF: glyph=523us cell+tex=21747us
+FRAME: total=22934us render=22557us swap=377us
+PERF: glyph=132us cell+tex=20726us
+FRAME: total=21429us render=21090us swap=339us
+PERF: glyph=445us cell+tex=22303us
+FRAME: total=23167us render=23011us swap=156us
+PERF: glyph=133us cell+tex=20485us
+FRAME: total=21456us render=20853us swap=603us
+PERF: glyph=202us cell+tex=21275us
+FRAME: total=22096us render=21741us swap=355us
+PERF: glyph=322us cell+tex=20361us
+FRAME: total=21262us render=20922us swap=340us
+PERF: glyph=147us cell+tex=20512us
+FRAME: total=21197us render=20877us swap=320us
+PERF: glyph=146us cell+tex=21232us
+FRAME: total=21978us render=21631us swap=347us
+PERF: glyph=153us cell+tex=20575us
+FRAME: total=21802us render=21138us swap=664us
+PERF: glyph=154us cell+tex=21030us
+FRAME: total=21742us render=21431us swap=311us
+PERF: glyph=132us cell+tex=21430us
+FRAME: total=22252us render=21819us swap=433us
+PERF: glyph=496us cell+tex=21231us
+FRAME: total=22908us render=22032us swap=876us
+PERF: glyph=485us cell+tex=20737us
+FRAME: total=21590us render=21470us swap=120us
+PERF: glyph=189us cell+tex=20608us
+FRAME: total=21399us render=21058us swap=341us
+PERF: glyph=132us cell+tex=20510us
+FRAME: total=21181us render=20869us swap=312us
+PERF: glyph=450us cell+tex=21149us
+FRAME: total=22216us render=21872us swap=344us
+PERF: glyph=134us cell+tex=20509us
+FRAME: total=21227us render=20891us swap=336us
+PERF: glyph=215us cell+tex=20957us
+FRAME: total=21754us render=21409us swap=345us
+PERF: glyph=137us cell+tex=20737us
+FRAME: total=21418us render=21099us swap=319us
+PERF: glyph=153us cell+tex=20400us
+FRAME: total=21109us render=20788us swap=321us
+PERF: glyph=151us cell+tex=22549us
+FRAME: total=23304us render=22953us swap=351us
+PERF: glyph=205us cell+tex=20865us
+FRAME: total=21652us render=21321us swap=331us
+PERF: glyph=332us cell+tex=20561us
+FRAME: total=21436us render=21117us swap=319us
+PERF: glyph=148us cell+tex=21434us
+FRAME: total=22161us render=21822us swap=339us
+PERF: glyph=170us cell+tex=21071us
+FRAME: total=21789us render=21473us swap=316us
+PERF: glyph=138us cell+tex=20466us
+FRAME: total=21281us render=20881us swap=400us
+PERF: glyph=312us cell+tex=20391us
+FRAME: total=21265us render=20939us swap=326us
+PERF: glyph=145us cell+tex=21552us
+FRAME: total=22312us render=21967us swap=345us
+PERF: glyph=166us cell+tex=20866us
+FRAME: total=21629us render=21252us swap=377us
+PERF: glyph=501us cell+tex=20811us
+FRAME: total=21915us render=21568us swap=347us
+PERF: glyph=179us cell+tex=21248us
+FRAME: total=22121us render=21756us swap=365us
+PERF: glyph=136us cell+tex=21333us
+FRAME: total=21932us render=21647us swap=285us
+PERF: glyph=150us cell+tex=20635us
+FRAME: total=21381us render=21042us swap=339us
+PERF: glyph=350us cell+tex=20863us
+FRAME: total=21772us render=21449us swap=323us
+PERF: glyph=163us cell+tex=20738us
+FRAME: total=21502us render=21154us swap=348us
+PERF: glyph=133us cell+tex=20488us
+FRAME: total=21173us render=20853us swap=320us
+PERF: glyph=141us cell+tex=20649us
+FRAME: total=21549us render=21187us swap=362us
+PERF: glyph=240us cell+tex=21571us
+FRAME: total=22411us render=22068us swap=343us
+PERF: glyph=136us cell+tex=20586us
+FRAME: total=21272us render=20944us swap=328us
+PERF: glyph=136us cell+tex=20464us
+FRAME: total=21166us render=20845us swap=321us
+PERF: glyph=362us cell+tex=20846us
+FRAME: total=21780us render=21443us swap=337us
+PERF: glyph=139us cell+tex=20538us
+FRAME: total=21101us render=20954us swap=147us
+PERF: glyph=189us cell+tex=20557us
+FRAME: total=21120us render=20977us swap=143us
+PERF: glyph=142us cell+tex=40390us
+FRAME: total=40993us render=40733us swap=260us
+PERF: glyph=404us cell+tex=21399us
+FRAME: total=22368us render=22038us swap=330us
+PERF: glyph=141us cell+tex=20481us
+FRAME: total=21201us render=20860us swap=341us
+PERF: glyph=174us cell+tex=20673us
+FRAME: total=21428us render=21101us swap=327us
+PERF: glyph=348us cell+tex=20918us
+FRAME: total=21832us render=21494us swap=338us
+PERF: glyph=140us cell+tex=20546us
+FRAME: total=21247us render=20918us swap=329us
+PERF: glyph=136us cell+tex=20708us
+FRAME: total=21456us render=21093us swap=363us
+PERF: glyph=139us cell+tex=20869us
+FRAME: total=21558us render=21245us swap=313us
+PERF: glyph=337us cell+tex=20533us
+FRAME: total=21459us render=21115us swap=344us
+PERF: glyph=134us cell+tex=20471us
+FRAME: total=21173us render=20833us swap=340us
+PERF: glyph=136us cell+tex=21060us
+FRAME: total=21781us render=21451us swap=330us
+PERF: glyph=201us cell+tex=21524us
+FRAME: total=22292us render=21955us swap=337us
+PERF: glyph=179us cell+tex=20698us
+FRAME: total=21562us render=21183us swap=379us
+PERF: glyph=176us cell+tex=22125us
+FRAME: total=22952us render=22591us swap=361us
+PERF: glyph=144us cell+tex=20942us
+FRAME: total=21767us render=21388us swap=379us
+PERF: glyph=362us cell+tex=20513us
+FRAME: total=21458us render=21129us swap=329us
+PERF: glyph=142us cell+tex=20567us
+FRAME: total=21242us render=20930us swap=312us
+PERF: glyph=143us cell+tex=20592us
+FRAME: total=21315us render=20983us swap=332us
+PERF: glyph=140us cell+tex=20667us
+FRAME: total=21433us render=21086us swap=347us
+PERF: glyph=320us cell+tex=20670us
+FRAME: total=21534us render=21217us swap=317us
+PERF: glyph=200us cell+tex=21059us
+FRAME: total=21848us render=21514us swap=334us
+PERF: glyph=135us cell+tex=20480us
+FRAME: total=21186us render=20859us swap=327us
+PERF: glyph=160us cell+tex=20915us
+FRAME: total=21649us render=21316us swap=333us
+PERF: glyph=142us cell+tex=22306us
+FRAME: total=23008us render=22680us swap=328us
+PERF: glyph=186us cell+tex=20471us
+FRAME: total=21273us render=20921us swap=352us
+PERF: glyph=156us cell+tex=20592us
+FRAME: total=21318us render=21015us swap=303us
+PERF: glyph=354us cell+tex=20447us
+FRAME: total=21336us render=21023us swap=313us
+PERF: glyph=159us cell+tex=21382us
+FRAME: total=22085us render=21766us swap=319us
+PERF: glyph=146us cell+tex=20589us
+FRAME: total=21278us render=20964us swap=314us
+PERF: glyph=147us cell+tex=20584us
+FRAME: total=21334us render=20988us swap=346us
+PERF: glyph=368us cell+tex=21304us
+FRAME: total=22266us render=21933us swap=333us
+PERF: glyph=141us cell+tex=20540us
+FRAME: total=21240us render=20908us swap=332us
+PERF: glyph=145us cell+tex=20546us
+FRAME: total=21237us render=20920us swap=317us
+PERF: glyph=391us cell+tex=20761us
+FRAME: total=21703us render=21386us swap=317us
+PERF: glyph=130us cell+tex=21144us
+FRAME: total=21834us render=21502us swap=332us
+PERF: glyph=136us cell+tex=20476us
+FRAME: total=21161us render=20826us swap=335us
+PERF: glyph=141us cell+tex=21151us
+FRAME: total=21932us render=21567us swap=365us
+PERF: glyph=330us cell+tex=20441us
+FRAME: total=21344us render=21024us swap=320us
+PERF: glyph=147us cell+tex=20538us
+FRAME: total=21299us render=20934us swap=365us
+PERF: glyph=252us cell+tex=22959us
+FRAME: total=23902us render=23467us swap=435us
+PERF: glyph=290us cell+tex=21740us
+FRAME: total=22614us render=22282us swap=332us
+PERF: glyph=157us cell+tex=21353us
+FRAME: total=22071us render=21750us swap=321us
+PERF: glyph=147us cell+tex=20793us
+FRAME: total=21536us render=21159us swap=377us
+PERF: glyph=152us cell+tex=20596us
+FRAME: total=21313us render=20983us swap=330us
+PERF: glyph=388us cell+tex=20484us
+FRAME: total=21466us render=21093us swap=373us
+PERF: glyph=143us cell+tex=21612us
+FRAME: total=22229us render=21936us swap=293us
+PERF: glyph=135us cell+tex=20860us
+FRAME: total=21559us render=21229us swap=330us
+PERF: glyph=135us cell+tex=20720us
+FRAME: total=21456us render=21126us swap=330us
+PERF: glyph=358us cell+tex=20392us
+FRAME: total=21286us render=20977us swap=309us
+PERF: glyph=147us cell+tex=20727us
+FRAME: total=21487us render=21148us swap=339us
+PERF: glyph=138us cell+tex=20621us
+FRAME: total=21334us render=21005us swap=329us
+PERF: glyph=358us cell+tex=20531us
+FRAME: total=21490us render=21175us swap=315us
+PERF: glyph=143us cell+tex=21561us
+FRAME: total=22286us render=21958us swap=328us
+PERF: glyph=141us cell+tex=20580us
+FRAME: total=21270us render=20942us swap=328us
+PERF: glyph=136us cell+tex=20690us
+FRAME: total=21445us render=21081us swap=364us
+PERF: glyph=321us cell+tex=20659us
+FRAME: total=21868us render=21212us swap=656us
+PERF: glyph=475us cell+tex=29595us
+FRAME: total=30566us render=30282us swap=284us
+PERF: glyph=189us cell+tex=21347us
+FRAME: total=22018us render=21731us swap=287us
+PERF: glyph=136us cell+tex=20775us
+FRAME: total=21487us render=21155us swap=332us
+PERF: glyph=138us cell+tex=20663us
+FRAME: total=21362us render=21029us swap=333us
+PERF: glyph=192us cell+tex=20826us
+FRAME: total=21611us render=21282us swap=329us
+PERF: glyph=146us cell+tex=21453us
+FRAME: total=22165us render=21838us swap=327us
+PERF: glyph=353us cell+tex=20597us
+FRAME: total=21546us render=21193us swap=353us
+PERF: glyph=165us cell+tex=20850us
+FRAME: total=21559us render=21259us swap=300us
+PERF: glyph=142us cell+tex=21221us
+FRAME: total=21879us render=21619us swap=260us
+PERF: glyph=150us cell+tex=21618us
+FRAME: total=22335us render=22015us swap=320us
+PERF: glyph=337us cell+tex=20620us
+FRAME: total=21538us render=21207us swap=331us
+PERF: glyph=142us cell+tex=20603us
+FRAME: total=21137us render=20996us swap=141us
+PERF: glyph=150us cell+tex=21124us
+FRAME: total=21691us render=21530us swap=161us
+PERF: glyph=448us cell+tex=21934us
+FRAME: total=23164us render=22632us swap=532us
+PERF: glyph=153us cell+tex=20756us
+FRAME: total=21787us render=21165us swap=622us
+PERF: glyph=142us cell+tex=20667us
+FRAME: total=21202us render=21054us swap=148us
+PERF: glyph=143us cell+tex=20565us
+FRAME: total=21228us render=20933us swap=295us
+PERF: glyph=437us cell+tex=20959us
+FRAME: total=21956us render=21626us swap=330us
+PERF: glyph=141us cell+tex=20516us
+FRAME: total=21209us render=20896us swap=313us
+PERF: glyph=145us cell+tex=20583us
+FRAME: total=21301us render=20972us swap=329us
+PERF: glyph=180us cell+tex=20971us
+FRAME: total=21753us render=21416us swap=337us
+PERF: glyph=144us cell+tex=20474us
+FRAME: total=20933us render=20833us swap=100us
+PERF: glyph=139us cell+tex=20488us
+FRAME: total=21203us render=20873us swap=330us
+PERF: glyph=139us cell+tex=20769us
+FRAME: total=21486us render=21160us swap=326us
+PERF: glyph=394us cell+tex=21146us
+FRAME: total=22142us render=21814us swap=328us
+PERF: glyph=132us cell+tex=20494us
+FRAME: total=21210us render=20884us swap=326us
+PERF: glyph=150us cell+tex=21053us
+FRAME: total=21801us render=21463us swap=338us
+PERF: glyph=141us cell+tex=20477us
+FRAME: total=21207us render=20876us swap=331us
+PERF: glyph=354us cell+tex=20627us
+FRAME: total=21562us render=21226us swap=336us
+PERF: glyph=139us cell+tex=21252us
+FRAME: total=21955us render=21625us swap=330us
+PERF: glyph=149us cell+tex=20698us
+FRAME: total=21433us render=21105us swap=328us
+PERF: glyph=363us cell+tex=22283us
+FRAME: total=23299us render=22925us swap=374us
+PERF: glyph=146us cell+tex=20504us
+FRAME: total=21244us render=20904us swap=340us
+PERF: glyph=137us cell+tex=20552us
+FRAME: total=21274us render=20936us swap=338us
+PERF: glyph=167us cell+tex=20886us
+FRAME: total=21736us render=21345us swap=391us
+PERF: glyph=410us cell+tex=21436us
+FRAME: total=22231us render=22088us swap=143us
+PERF: glyph=155us cell+tex=20569us
+FRAME: total=21323us render=20977us swap=346us
+PERF: glyph=137us cell+tex=20582us
+FRAME: total=21289us render=20942us swap=347us
+PERF: glyph=161us cell+tex=20975us
+FRAME: total=21576us render=21426us swap=150us
+PERF: glyph=145us cell+tex=20738us
+FRAME: total=21455us render=21132us swap=323us
+PERF: glyph=148us cell+tex=20659us
+FRAME: total=21379us render=21046us swap=333us
+PERF: glyph=147us cell+tex=20787us
+FRAME: total=21512us render=21175us swap=337us
+PERF: glyph=333us cell+tex=20511us
+FRAME: total=21233us render=21092us swap=141us
+PERF: glyph=140us cell+tex=20532us
+FRAME: total=21164us render=20882us swap=282us
+PERF: glyph=399us cell+tex=23756us
+FRAME: total=24771us render=24418us swap=353us
+PERF: glyph=220us cell+tex=21016us
+FRAME: total=21789us render=21482us swap=307us
+PERF: glyph=310us cell+tex=20473us
+FRAME: total=21365us render=21028us swap=337us
+PERF: glyph=133us cell+tex=21007us
+FRAME: total=21729us render=21376us swap=353us
+PERF: glyph=164us cell+tex=21116us
+FRAME: total=21868us render=21538us swap=330us
+PERF: glyph=391us cell+tex=20922us
+FRAME: total=21879us render=21539us swap=340us
+PERF: glyph=154us cell+tex=20650us
+FRAME: total=21340us render=21030us swap=310us
+PERF: glyph=146us cell+tex=20575us
+FRAME: total=21271us render=20947us swap=324us
+PERF: glyph=146us cell+tex=20498us
+FRAME: total=21201us render=20875us swap=326us
+PERF: glyph=345us cell+tex=20739us
+FRAME: total=21689us render=21350us swap=339us
+PERF: glyph=139us cell+tex=20397us
+FRAME: total=21098us render=20773us swap=325us
+PERF: glyph=136us cell+tex=20548us
+FRAME: total=21264us render=20930us swap=334us
+PERF: glyph=136us cell+tex=21469us
+FRAME: total=22363us render=22014us swap=349us
+PERF: glyph=140us cell+tex=20426us
+FRAME: total=21138us render=20808us swap=330us
+PERF: glyph=141us cell+tex=21129us
+FRAME: total=21746us render=21451us swap=295us
+PERF: glyph=138us cell+tex=20945us
+FRAME: total=21623us render=21310us swap=313us
+PERF: glyph=366us cell+tex=20484us
+FRAME: total=21448us render=21115us swap=333us
+PERF: glyph=182us cell+tex=20487us
+FRAME: total=21235us render=20916us swap=319us
+PERF: glyph=157us cell+tex=21082us
+FRAME: total=21960us render=21498us swap=462us
+PERF: glyph=154us cell+tex=20623us
+FRAME: total=21342us render=21011us swap=331us
+PERF: glyph=322us cell+tex=20663us
+FRAME: total=21602us render=21217us swap=385us
+PERF: glyph=142us cell+tex=21327us
+FRAME: total=22044us render=21714us swap=330us
+PERF: glyph=134us cell+tex=20646us
+FRAME: total=21349us render=21019us swap=330us
+PERF: glyph=337us cell+tex=20600us
+FRAME: total=21522us render=21181us swap=341us
+PERF: glyph=133us cell+tex=20684us
+FRAME: total=21371us render=21055us swap=316us
+PERF: glyph=185us cell+tex=20522us
+FRAME: total=21257us render=20937us swap=320us
+PERF: glyph=146us cell+tex=21159us
+FRAME: total=21895us render=21547us swap=348us
+PERF: glyph=340us cell+tex=20471us
+FRAME: total=21359us render=21048us swap=311us
+PERF: glyph=206us cell+tex=21473us
+FRAME: total=22338us render=21966us swap=372us
+PERF: glyph=149us cell+tex=20880us
+FRAME: total=21574us render=21257us swap=317us
+PERF: glyph=171us cell+tex=20620us
+FRAME: total=21347us render=21027us swap=320us
+PERF: glyph=158us cell+tex=20607us
+FRAME: total=21393us render=21043us swap=350us
+PERF: glyph=136us cell+tex=21286us
+FRAME: total=21973us render=21650us swap=323us
+PERF: glyph=132us cell+tex=21489us
+FRAME: total=22178us render=21843us swap=335us
+PERF: glyph=319us cell+tex=20596us
+FRAME: total=21496us render=21171us swap=325us
+PERF: glyph=138us cell+tex=20376us
+FRAME: total=21138us render=20765us swap=373us
+PERF: glyph=158us cell+tex=20901us
+FRAME: total=21880us render=21306us swap=574us
+PERF: glyph=185us cell+tex=20708us
+FRAME: total=21457us render=21123us swap=334us
+PERF: glyph=336us cell+tex=20874us
+FRAME: total=21811us render=21460us swap=351us
+PERF: glyph=165us cell+tex=20644us
+FRAME: total=21374us render=21046us swap=328us
+PERF: glyph=135us cell+tex=21388us
+FRAME: total=22075us render=21756us swap=319us
+PERF: glyph=301us cell+tex=20438us
+FRAME: total=21298us render=20975us swap=323us
+PERF: glyph=134us cell+tex=20557us
+FRAME: total=21266us render=20933us swap=333us
+PERF: glyph=124us cell+tex=20861us
+FRAME: total=21558us render=21220us swap=338us
+PERF: glyph=149us cell+tex=21161us
+FRAME: total=21934us render=21595us swap=339us
+PERF: glyph=122us cell+tex=20512us
+FRAME: total=21409us render=21077us swap=332us
+PERF: glyph=135us cell+tex=20455us
+FRAME: total=21162us render=20837us swap=325us
+PERF: glyph=140us cell+tex=20749us
+FRAME: total=21485us render=21147us swap=338us
+PERF: glyph=133us cell+tex=20652us
+FRAME: total=21519us render=21191us swap=328us
+PERF: glyph=129us cell+tex=20936us
+FRAME: total=21636us render=21299us swap=337us
+PERF: glyph=129us cell+tex=21309us
+FRAME: total=22040us render=21700us swap=340us
+PERF: glyph=149us cell+tex=20725us
+FRAME: total=21441us render=21121us swap=320us
+PERF: glyph=136us cell+tex=20772us
+FRAME: total=21500us render=21135us swap=365us
+PERF: glyph=136us cell+tex=20569us
+FRAME: total=21589us render=20946us swap=643us
+PERF: glyph=163us cell+tex=20964us
+FRAME: total=21789us render=21376us swap=413us
+PERF: glyph=142us cell+tex=20562us
+FRAME: total=21665us render=20949us swap=716us
+PERF: glyph=124us cell+tex=20654us
+FRAME: total=21533us render=21005us swap=528us
+PERF: glyph=197us cell+tex=20974us
+FRAME: total=21984us render=21393us swap=591us
+PERF: glyph=168us cell+tex=21355us
+FRAME: total=22503us render=21775us swap=728us
+PERF: glyph=129us cell+tex=21040us
+FRAME: total=21940us render=21403us swap=537us
+PERF: glyph=334us cell+tex=21539us
+FRAME: total=22622us render=22053us swap=569us
+PERF: glyph=126us cell+tex=20425us
+FRAME: total=21441us render=20776us swap=665us
+PERF: glyph=173us cell+tex=20684us
+FRAME: total=21632us render=21101us swap=531us
+PERF: glyph=130us cell+tex=21202us
+FRAME: total=22293us render=21579us swap=714us
+PERF: glyph=916us cell+tex=22410us
+FRAME: total=24458us render=23592us swap=866us
+PERF: glyph=320us cell+tex=21817us
+FRAME: total=23103us render=22420us swap=683us
+PERF: glyph=129us cell+tex=21283us
+FRAME: total=22199us render=21651us swap=548us
+PERF: glyph=151us cell+tex=20717us
+FRAME: total=21655us render=21107us swap=548us
+PERF: glyph=317us cell+tex=20408us
+FRAME: total=21639us render=20977us swap=662us
+PERF: glyph=135us cell+tex=20379us
+FRAME: total=21287us render=20766us swap=521us
+PERF: glyph=179us cell+tex=21105us
+FRAME: total=22379us render=21571us swap=808us
+PERF: glyph=417us cell+tex=29510us
+FRAME: total=30803us render=30188us swap=615us
+PERF: glyph=1136us cell+tex=22553us
+FRAME: total=24575us render=23970us swap=605us
+PERF: glyph=125us cell+tex=20392us
+FRAME: total=21389us render=20747us swap=642us
+PERF: glyph=131us cell+tex=20701us
+FRAME: total=21639us render=21068us swap=571us
+PERF: glyph=128us cell+tex=20622us
+FRAME: total=21523us render=20975us swap=548us
+PERF: glyph=333us cell+tex=20662us
+FRAME: total=21709us render=21270us swap=439us
+PERF: glyph=163us cell+tex=21112us
+FRAME: total=22031us render=21559us swap=472us
+PERF: glyph=154us cell+tex=21387us
+FRAME: total=22354us render=21754us swap=600us
+PERF: glyph=346us cell+tex=30617us
+FRAME: total=31729us render=31206us swap=523us
+PERF: glyph=318us cell+tex=20438us
+FRAME: total=21569us render=21004us swap=565us
+PERF: glyph=164us cell+tex=21276us
+FRAME: total=22291us render=21680us swap=611us
+PERF: glyph=131us cell+tex=20658us
+FRAME: total=21592us render=21014us swap=578us
+PERF: glyph=148us cell+tex=20686us
+FRAME: total=21424us render=21093us swap=331us
+PERF: glyph=172us cell+tex=21402us
+FRAME: total=22156us render=21812us swap=344us
+PERF: glyph=123us cell+tex=21289us
+FRAME: total=21975us render=21637us swap=338us
+PERF: glyph=124us cell+tex=20725us
+FRAME: total=21404us render=21085us swap=319us
+PERF: glyph=315us cell+tex=20434us
+FRAME: total=21314us render=20980us swap=334us
+PERF: glyph=174us cell+tex=20516us
+FRAME: total=21274us render=20946us swap=328us
+PERF: glyph=152us cell+tex=21142us
+FRAME: total=21904us render=21552us swap=352us
+PERF: glyph=119us cell+tex=20613us
+FRAME: total=21572us render=20962us swap=610us
+PERF: glyph=344us cell+tex=20581us
+FRAME: total=21516us render=21177us swap=339us
+PERF: glyph=125us cell+tex=21596us
+FRAME: total=22354us render=21985us swap=369us
+PERF: glyph=176us cell+tex=20799us
+FRAME: total=21820us render=21202us swap=618us
+PERF: glyph=328us cell+tex=20534us
+FRAME: total=21448us render=21112us swap=336us
+PERF: glyph=138us cell+tex=22069us
+FRAME: total=22685us render=22390us swap=295us
+PERF: glyph=170us cell+tex=21101us
+FRAME: total=21926us render=21554us swap=372us
+PERF: glyph=171us cell+tex=21305us
+FRAME: total=22110us render=21751us swap=359us
+PERF: glyph=248us cell+tex=21892us
+FRAME: total=22722us render=22374us swap=348us
+PERF: glyph=167us cell+tex=20964us
+FRAME: total=21864us render=21349us swap=515us
+PERF: glyph=486us cell+tex=22571us
+FRAME: total=23776us render=23401us swap=375us
+PERF: glyph=344us cell+tex=21313us
+FRAME: total=22539us render=21920us swap=619us
+PERF: glyph=230us cell+tex=21092us
+FRAME: total=22090us render=21557us swap=533us
+PERF: glyph=131us cell+tex=20568us
+FRAME: total=21250us render=20910us swap=340us
+PERF: glyph=334us cell+tex=20502us
+FRAME: total=21427us render=21078us swap=349us
+PERF: glyph=144us cell+tex=21164us
+FRAME: total=22104us render=21568us swap=536us
+PERF: glyph=143us cell+tex=20843us
+FRAME: total=21626us render=21255us swap=371us
+PERF: glyph=132us cell+tex=21516us
+FRAME: total=22298us render=21831us swap=467us
+PERF: glyph=180us cell+tex=20503us
+FRAME: total=21303us render=20936us swap=367us
+PERF: glyph=177us cell+tex=20886us
+FRAME: total=21774us render=21314us swap=460us
+PERF: glyph=439us cell+tex=21265us
+FRAME: total=22320us render=21971us swap=349us
+PERF: glyph=125us cell+tex=20451us
+FRAME: total=21371us render=21002us swap=369us
+PERF: glyph=311us cell+tex=21135us
+FRAME: total=22276us render=21717us swap=559us
+PERF: glyph=158us cell+tex=21347us
+FRAME: total=22061us render=21737us swap=324us
+PERF: glyph=135us cell+tex=20409us
+FRAME: total=21353us render=20777us swap=576us
+PERF: glyph=137us cell+tex=20995us
+FRAME: total=21749us render=21400us swap=349us
+PERF: glyph=127us cell+tex=20512us
+FRAME: total=21153us render=20844us swap=309us
+PERF: glyph=159us cell+tex=20629us
+FRAME: total=21379us render=21040us swap=339us
+PERF: glyph=161us cell+tex=21047us
+FRAME: total=21840us render=21499us swap=341us
+PERF: glyph=118us cell+tex=21303us
+FRAME: total=21936us render=21633us swap=303us
+PERF: glyph=125us cell+tex=20806us
+FRAME: total=21515us render=21165us swap=350us
+PERF: glyph=130us cell+tex=20641us
+FRAME: total=21352us render=21018us swap=334us
+PERF: glyph=126us cell+tex=20412us
+FRAME: total=21161us render=20807us swap=354us
+PERF: glyph=149us cell+tex=20898us
+FRAME: total=21772us render=21263us swap=509us
+PERF: glyph=326us cell+tex=20732us
+FRAME: total=21713us render=21339us swap=374us
+PERF: glyph=168us cell+tex=20667us
+FRAME: total=21404us render=21084us swap=320us
+PERF: glyph=133us cell+tex=21561us
+FRAME: total=22295us render=21945us swap=350us
+PERF: glyph=126us cell+tex=20406us
+FRAME: total=21113us render=20782us swap=331us
+PERF: glyph=339us cell+tex=20454us
+FRAME: total=21393us render=21052us swap=341us
+PERF: glyph=126us cell+tex=20970us
+FRAME: total=21683us render=21349us swap=334us
+PERF: glyph=121us cell+tex=20536us
+FRAME: total=21240us render=20898us swap=342us
+PERF: glyph=126us cell+tex=21450us
+FRAME: total=22091us render=21769us swap=322us
+PERF: glyph=286us cell+tex=21070us
+FRAME: total=22284us render=21630us swap=654us
+PERF: glyph=440us cell+tex=25137us
+FRAME: total=26517us render=25849us swap=668us
+PERF: glyph=432us cell+tex=21538us
+FRAME: total=22669us render=22222us swap=447us
+PERF: glyph=427us cell+tex=27410us
+FRAME: total=28869us render=28118us swap=751us
+PERF: glyph=1077us cell+tex=23351us
+FRAME: total=25086us render=24720us swap=366us
+PERF: glyph=133us cell+tex=20452us
+FRAME: total=21382us render=20818us swap=564us
+PERF: glyph=125us cell+tex=20935us
+FRAME: total=21868us render=21288us swap=580us
+PERF: glyph=143us cell+tex=21009us
+FRAME: total=21839us render=21390us swap=449us
+PERF: glyph=312us cell+tex=20485us
+FRAME: total=21705us render=21045us swap=660us
+PERF: glyph=138us cell+tex=20429us
+FRAME: total=21512us render=20795us swap=717us
+PERF: glyph=551us cell+tex=23893us
+FRAME: total=25296us render=24774us swap=522us
+PERF: glyph=343us cell+tex=25520us
+FRAME: total=26694us render=26085us swap=609us
+PERF: glyph=303us cell+tex=20505us
+FRAME: total=21664us render=21049us swap=615us
+PERF: glyph=430us cell+tex=26237us
+FRAME: total=27620us render=26935us swap=685us
+PERF: glyph=147us cell+tex=21512us
+FRAME: total=22437us render=21930us swap=507us
+PERF: glyph=142us cell+tex=20797us
+FRAME: total=21701us render=21218us swap=483us
+PERF: glyph=408us cell+tex=20602us
+FRAME: total=21901us render=21279us swap=622us
+PERF: glyph=197us cell+tex=20992us
+FRAME: total=21859us render=21435us swap=424us
+PERF: glyph=131us cell+tex=21392us
+FRAME: total=22098us render=21748us swap=350us
+PERF: glyph=398us cell+tex=20951us
+FRAME: total=21940us render=21602us swap=338us
+PERF: glyph=127us cell+tex=20393us
+FRAME: total=21141us render=20774us swap=367us
+PERF: glyph=119us cell+tex=20545us
+FRAME: total=21549us render=20896us swap=653us
+PERF: glyph=425us cell+tex=28799us
+FRAME: total=29827us render=29488us swap=339us
+PERF: glyph=300us cell+tex=20566us
+FRAME: total=21490us render=21128us swap=362us
+PERF: glyph=155us cell+tex=21216us
+FRAME: total=22377us render=21601us swap=776us
+PERF: glyph=420us cell+tex=33243us
+FRAME: total=34178us render=33880us swap=298us
+PERF: glyph=410us cell+tex=20864us
+FRAME: total=22130us render=21504us swap=626us
+PERF: glyph=125us cell+tex=20536us
+FRAME: total=21164us render=20861us swap=303us
+PERF: glyph=144us cell+tex=20758us
+FRAME: total=21531us render=21161us swap=370us
+PERF: glyph=1424us cell+tex=22136us
+FRAME: total=24222us render=23856us swap=366us
+PERF: glyph=131us cell+tex=20430us
+FRAME: total=21125us render=20793us swap=332us
+PERF: glyph=220us cell+tex=22047us
+FRAME: total=22822us render=22484us swap=338us
+PERF: glyph=130us cell+tex=20515us
+FRAME: total=21355us render=20875us swap=480us
+PERF: glyph=277us cell+tex=20493us
+FRAME: total=21330us render=20994us swap=336us
+PERF: glyph=126us cell+tex=20745us
+FRAME: total=21712us render=21110us swap=602us
+PERF: glyph=250us cell+tex=21199us
+FRAME: total=22115us render=21713us swap=402us
+PERF: glyph=270us cell+tex=24950us
+FRAME: total=26104us render=25491us swap=613us
+PERF: glyph=129us cell+tex=20507us
+FRAME: total=21287us render=20886us swap=401us
+PERF: glyph=178us cell+tex=22332us
+FRAME: total=23135us render=22775us swap=360us
+PERF: glyph=359us cell+tex=20426us
+FRAME: total=21702us render=21037us swap=665us
+PERF: glyph=119us cell+tex=20495us
+FRAME: total=21219us render=20844us swap=375us
+PERF: glyph=128us cell+tex=20739us
+FRAME: total=21382us render=21073us swap=309us
+PERF: glyph=128us cell+tex=20501us
+FRAME: total=21207us render=20872us swap=335us
+PERF: glyph=123us cell+tex=20516us
+FRAME: total=21327us render=20989us swap=338us
+PERF: glyph=126us cell+tex=20505us
+FRAME: total=21174us render=20853us swap=321us
+PERF: glyph=114us cell+tex=20489us
+FRAME: total=21160us render=20835us swap=325us
+PERF: glyph=118us cell+tex=20493us
+FRAME: total=21160us render=20839us swap=321us
+PERF: glyph=124us cell+tex=21044us
+FRAME: total=21761us render=21429us swap=332us
+PERF: glyph=286us cell+tex=21223us
+FRAME: total=22026us render=21709us swap=317us
+PERF: glyph=129us cell+tex=20583us
+FRAME: total=21313us render=20974us swap=339us
+PERF: glyph=114us cell+tex=20816us
+FRAME: total=21553us render=21183us swap=370us
+PERF: glyph=117us cell+tex=20543us
+FRAME: total=21495us render=20900us swap=595us
+PERF: glyph=258us cell+tex=20416us
+FRAME: total=21229us render=20896us swap=333us
+PERF: glyph=116us cell+tex=21756us
+FRAME: total=22421us render=22109us swap=312us
+PERF: glyph=143us cell+tex=20516us
+FRAME: total=21523us render=20914us swap=609us
+PERF: glyph=300us cell+tex=20488us
+FRAME: total=21295us render=21048us swap=247us
+PERF: glyph=122us cell+tex=20798us
+FRAME: total=21479us render=21147us swap=332us
+PERF: glyph=119us cell+tex=20783us
+FRAME: total=21445us render=21117us swap=328us
+PERF: glyph=110us cell+tex=20506us
+FRAME: total=21114us render=20814us swap=300us
+PERF: glyph=270us cell+tex=20565us
+FRAME: total=21343us render=21037us swap=306us
+PERF: glyph=110us cell+tex=21362us
+FRAME: total=22023us render=21703us swap=320us
+PERF: glyph=116us cell+tex=21250us
+FRAME: total=22001us render=21648us swap=353us
+PERF: glyph=173us cell+tex=20782us
+FRAME: total=21574us render=21219us swap=355us
+PERF: glyph=267us cell+tex=20800us
+FRAME: total=21672us render=21315us swap=357us
+PERF: glyph=113us cell+tex=20970us
+FRAME: total=21631us render=21306us swap=325us
+PERF: glyph=138us cell+tex=20431us
+FRAME: total=21123us render=20801us swap=322us
+PERF: glyph=125us cell+tex=20583us
+FRAME: total=21275us render=20958us swap=317us
+PERF: glyph=126us cell+tex=21231us
+FRAME: total=21914us render=21588us swap=326us
+PERF: glyph=315us cell+tex=20488us
+FRAME: total=21419us render=21070us swap=349us
+PERF: glyph=129us cell+tex=20537us
+FRAME: total=21373us render=20902us swap=471us
+PERF: glyph=120us cell+tex=20877us
+FRAME: total=21560us render=21234us swap=326us
+PERF: glyph=176us cell+tex=20854us
+FRAME: total=21577us render=21260us swap=317us
+PERF: glyph=267us cell+tex=20428us
+FRAME: total=21307us render=20957us swap=350us
+PERF: glyph=113us cell+tex=21576us
+FRAME: total=22177us render=21874us swap=303us
+PERF: glyph=180us cell+tex=21794us
+FRAME: total=22643us render=22254us swap=389us
+PERF: glyph=303us cell+tex=22817us
+FRAME: total=23724us render=23382us swap=342us
+PERF: glyph=448us cell+tex=20577us
+FRAME: total=21723us render=21342us swap=381us
+PERF: glyph=123us cell+tex=20457us
+FRAME: total=21125us render=20813us swap=312us
+PERF: glyph=116us cell+tex=20608us
+FRAME: total=21328us render=20946us swap=382us
+PERF: glyph=165us cell+tex=21535us
+FRAME: total=22237us render=21921us swap=316us
+PERF: glyph=260us cell+tex=20352us
+FRAME: total=21157us render=20838us swap=319us
+PERF: glyph=123us cell+tex=20552us
+FRAME: total=21254us render=20915us swap=339us
+PERF: glyph=321us cell+tex=23338us
+FRAME: total=24323us render=23966us swap=357us
+PERF: glyph=122us cell+tex=20486us
+FRAME: total=21212us render=20850us swap=362us
+PERF: glyph=133us cell+tex=20882us
+FRAME: total=21739us render=21392us swap=347us
+PERF: glyph=116us cell+tex=21037us
+FRAME: total=21739us render=21401us swap=338us
+PERF: glyph=114us cell+tex=22527us
+FRAME: total=23146us render=22830us swap=316us
+PERF: glyph=123us cell+tex=20580us
+FRAME: total=21267us render=20944us swap=323us
+PERF: glyph=123us cell+tex=22612us
+FRAME: total=23568us render=23147us swap=421us
+PERF: glyph=730us cell+tex=21723us
+FRAME: total=23080us render=22740us swap=340us
+PERF: glyph=132us cell+tex=20345us
+FRAME: total=21007us render=20705us swap=302us
+PERF: glyph=115us cell+tex=21162us
+FRAME: total=21837us render=21503us swap=334us
+PERF: glyph=155us cell+tex=20572us
+FRAME: total=21254us render=20944us swap=310us
+PERF: glyph=303us cell+tex=20535us
+FRAME: total=21469us render=21073us swap=396us
+PERF: glyph=113us cell+tex=20784us
+FRAME: total=21688us render=21126us swap=562us
+PERF: glyph=375us cell+tex=23785us
+FRAME: total=24752us render=24416us swap=336us
+PERF: glyph=114us cell+tex=20979us
+FRAME: total=21653us render=21320us swap=333us
+PERF: glyph=281us cell+tex=20671us
+FRAME: total=21527us render=21203us swap=324us
+PERF: glyph=113us cell+tex=20515us
+FRAME: total=21178us render=20856us swap=322us
+PERF: glyph=128us cell+tex=20634us
+FRAME: total=21318us render=20989us swap=329us
+PERF: glyph=132us cell+tex=21660us
+FRAME: total=22370us render=22032us swap=338us
+PERF: glyph=286us cell+tex=21135us
+FRAME: total=21984us render=21655us swap=329us
+PERF: glyph=133us cell+tex=20470us
+FRAME: total=21164us render=20834us swap=330us
+PERF: glyph=143us cell+tex=20554us
+FRAME: total=21346us render=20978us swap=368us
+PERF: glyph=122us cell+tex=20690us
+FRAME: total=21372us render=21045us swap=327us
+PERF: glyph=142us cell+tex=20930us
+FRAME: total=21605us render=21289us swap=316us
+PERF: glyph=112us cell+tex=20491us
+FRAME: total=21196us render=20852us swap=344us
+PERF: glyph=114us cell+tex=20636us
+FRAME: total=21324us render=20991us swap=333us
+PERF: glyph=125us cell+tex=20885us
+FRAME: total=21339us render=21218us swap=121us
+PERF: glyph=116us cell+tex=20520us
+FRAME: total=21195us render=20871us swap=324us
+PERF: glyph=263us cell+tex=20524us
+FRAME: total=21326us render=21005us swap=321us
+PERF: glyph=122us cell+tex=21847us
+FRAME: total=22636us render=22222us swap=414us
+PERF: glyph=122us cell+tex=22046us
+FRAME: total=22903us render=22351us swap=552us
+PERF: glyph=130us cell+tex=20538us
+FRAME: total=21459us render=20897us swap=562us
+PERF: glyph=326us cell+tex=20477us
+FRAME: total=21487us render=21043us swap=444us
+PERF: glyph=118us cell+tex=20883us
+FRAME: total=21768us render=21267us swap=501us
+PERF: glyph=119us cell+tex=21560us
+FRAME: total=22501us render=21938us swap=563us
+PERF: glyph=118us cell+tex=20785us
+FRAME: total=21729us render=21143us swap=586us
+PERF: glyph=266us cell+tex=20524us
+FRAME: total=21550us render=21016us swap=534us
+PERF: glyph=121us cell+tex=20556us
+FRAME: total=21590us render=20942us swap=648us
+PERF: glyph=133us cell+tex=20728us
+FRAME: total=21831us render=21107us swap=724us
+PERF: glyph=191us cell+tex=20659us
+FRAME: total=21704us render=21063us swap=641us
+PERF: glyph=309us cell+tex=20463us
+FRAME: total=21628us render=20990us swap=638us
+PERF: glyph=124us cell+tex=21049us
+FRAME: total=22013us render=21396us swap=617us
+PERF: glyph=133us cell+tex=22477us
+FRAME: total=23344us render=22813us swap=531us
+PERF: glyph=124us cell+tex=20931us
+FRAME: total=21758us render=21286us swap=472us
+PERF: glyph=316us cell+tex=20569us
+FRAME: total=21728us render=21123us swap=605us
+PERF: glyph=159us cell+tex=20626us
+FRAME: total=21438us render=21023us swap=415us
+PERF: glyph=136us cell+tex=21056us
+FRAME: total=21864us render=21441us swap=423us
+PERF: glyph=120us cell+tex=20511us
+FRAME: total=21446us render=20870us swap=576us
+PERF: glyph=288us cell+tex=20410us
+FRAME: total=21561us render=20940us swap=621us
+PERF: glyph=128us cell+tex=21882us
+FRAME: total=22912us render=22233us swap=679us
+PERF: glyph=415us cell+tex=22770us
+FRAME: total=23975us render=23442us swap=533us
+PERF: glyph=127us cell+tex=20982us
+FRAME: total=53895us render=53271us swap=624us
+PERF: glyph=627us cell+tex=21122us
+FRAME: total=22655us render=22041us swap=614us
+PERF: glyph=121us cell+tex=21265us
+FRAME: total=21982us render=21627us swap=355us
+PERF: glyph=109us cell+tex=20749us
+FRAME: total=21405us render=21070us swap=335us
+PERF: glyph=111us cell+tex=21474us
+FRAME: total=22061us render=21770us swap=291us
+PERF: glyph=255us cell+tex=20480us
+FRAME: total=21341us render=20955us swap=386us
+PERF: glyph=117us cell+tex=21488us
+FRAME: total=22450us render=21839us swap=611us
+PERF: glyph=116us cell+tex=20884us
+FRAME: total=21527us render=21226us swap=301us
+PERF: glyph=114us cell+tex=20516us
+FRAME: total=21236us render=20903us swap=333us
+PERF: glyph=265us cell+tex=20465us
+FRAME: total=21279us render=20966us swap=313us
+PERF: glyph=126us cell+tex=20605us
+FRAME: total=21272us render=20957us swap=315us
+PERF: glyph=115us cell+tex=20581us
+FRAME: total=21283us render=20937us swap=346us
+PERF: glyph=129us cell+tex=20668us
+FRAME: total=21362us render=21043us swap=319us
+PERF: glyph=118us cell+tex=21077us
+FRAME: total=21830us render=21463us swap=367us
+PERF: glyph=281us cell+tex=20720us
+FRAME: total=21688us render=21238us swap=450us
+PERF: glyph=115us cell+tex=20517us
+FRAME: total=21208us render=20874us swap=334us
+PERF: glyph=140us cell+tex=20551us
+FRAME: total=21283us render=20935us swap=348us
+PERF: glyph=121us cell+tex=22322us
+FRAME: total=22948us render=22644us swap=304us
+PERF: glyph=260us cell+tex=20565us
+FRAME: total=21443us render=21055us swap=388us
+PERF: glyph=118us cell+tex=20472us
+FRAME: total=21117us render=20804us swap=313us
+PERF: glyph=121us cell+tex=21126us
+FRAME: total=21885us render=21483us swap=402us
+PERF: glyph=150us cell+tex=21238us
+FRAME: total=21933us render=21616us swap=317us
+PERF: glyph=301us cell+tex=20420us
+FRAME: total=21398us render=20966us swap=432us
+PERF: glyph=143us cell+tex=20627us
+FRAME: total=21670us render=21008us swap=662us
+PERF: glyph=118us cell+tex=20559us
+FRAME: total=21318us render=20920us swap=398us
+PERF: glyph=145us cell+tex=20633us
+FRAME: total=21653us render=21050us swap=603us
+PERF: glyph=287us cell+tex=20499us
+FRAME: total=21511us render=21032us swap=479us
+PERF: glyph=132us cell+tex=21057us
+FRAME: total=21898us render=21427us swap=471us
+PERF: glyph=121us cell+tex=20542us
+FRAME: total=21496us render=20902us swap=594us
+PERF: glyph=113us cell+tex=20492us
+FRAME: total=21259us render=20818us swap=441us
+PERF: glyph=271us cell+tex=22197us
+FRAME: total=23352us render=22666us swap=686us
+PERF: glyph=186us cell+tex=20874us
+FRAME: total=22054us render=21308us swap=746us
+PERF: glyph=122us cell+tex=20547us
+FRAME: total=21565us render=20911us swap=654us
+PERF: glyph=177us cell+tex=20777us
+FRAME: total=21703us render=21214us swap=489us
+PERF: glyph=331us cell+tex=20689us
+FRAME: total=21938us render=21269us swap=669us
+PERF: glyph=133us cell+tex=20454us
+FRAME: total=21398us render=20827us swap=571us
+PERF: glyph=122us cell+tex=20417us
+FRAME: total=21373us render=20787us swap=586us
+PERF: glyph=135us cell+tex=21624us
+FRAME: total=22591us render=22014us swap=577us
+PERF: glyph=300us cell+tex=20599us
+FRAME: total=21589us render=21133us swap=456us
+PERF: glyph=131us cell+tex=20503us
+FRAME: total=21456us render=20887us swap=569us
+PERF: glyph=156us cell+tex=20741us
+FRAME: total=21792us render=21137us swap=655us
+PERF: glyph=353us cell+tex=22445us
+FRAME: total=23475us render=23065us swap=410us
+PERF: glyph=274us cell+tex=21455us
+FRAME: total=22279us render=21908us swap=371us
+PERF: glyph=232us cell+tex=20710us
+FRAME: total=21590us render=21181us swap=409us
+PERF: glyph=121us cell+tex=21314us
+FRAME: total=22314us render=21698us swap=616us
+PERF: glyph=124us cell+tex=20624us
+FRAME: total=21472us render=20981us swap=491us
+PERF: glyph=263us cell+tex=20433us
+FRAME: total=21466us render=20924us swap=542us
+PERF: glyph=125us cell+tex=21153us
+FRAME: total=22063us render=21505us swap=558us
+PERF: glyph=120us cell+tex=20581us
+FRAME: total=21511us render=20948us swap=563us
+PERF: glyph=133us cell+tex=20688us
+FRAME: total=21595us render=21054us swap=541us
+PERF: glyph=310us cell+tex=20760us
+FRAME: total=22113us render=21294us swap=819us
+PERF: glyph=174us cell+tex=20624us
+FRAME: total=21439us render=21051us swap=388us
+PERF: glyph=119us cell+tex=20388us
+FRAME: total=21306us render=20733us swap=573us
+PERF: glyph=127us cell+tex=20941us
+FRAME: total=21905us render=21319us swap=586us
+PERF: glyph=126us cell+tex=20585us
+FRAME: total=21651us render=20969us swap=682us
+PERF: glyph=258us cell+tex=22452us
+FRAME: total=23484us render=22926us swap=558us
+PERF: glyph=129us cell+tex=20515us
+FRAME: total=21512us render=20893us swap=619us
+PERF: glyph=122us cell+tex=20518us
+FRAME: total=21354us render=20876us swap=478us
+PERF: glyph=117us cell+tex=21390us
+FRAME: total=22397us render=21740us swap=657us
+PERF: glyph=311us cell+tex=20504us
+FRAME: total=21679us render=21070us swap=609us
+PERF: glyph=121us cell+tex=20460us
+FRAME: total=21123us render=20803us swap=320us
+PERF: glyph=122us cell+tex=20521us
+FRAME: total=21217us render=20891us swap=326us
+PERF: glyph=125us cell+tex=20656us
+FRAME: total=21390us render=21055us swap=335us
+PERF: glyph=249us cell+tex=20412us
+FRAME: total=21221us render=20901us swap=320us
+PERF: glyph=117us cell+tex=20473us
+FRAME: total=21181us render=20851us swap=330us
+PERF: glyph=123us cell+tex=20511us
+FRAME: total=21215us render=20886us swap=329us
+PERF: glyph=120us cell+tex=20475us
+FRAME: total=21180us render=20837us swap=343us
+PERF: glyph=303us cell+tex=21024us
+FRAME: total=21875us render=21567us swap=308us
+PERF: glyph=127us cell+tex=21561us
+FRAME: total=22177us render=21884us swap=293us
+PERF: glyph=117us cell+tex=20360us
+FRAME: total=21024us render=20709us swap=315us
+PERF: glyph=115us cell+tex=20678us
+FRAME: total=21323us render=21012us swap=311us
+PERF: glyph=397us cell+tex=20578us
+FRAME: total=21577us render=21257us swap=320us
+PERF: glyph=124us cell+tex=20314us
+FRAME: total=20985us render=20664us swap=321us
+PERF: glyph=118us cell+tex=20709us
+FRAME: total=21429us render=21079us swap=350us
+PERF: glyph=114us cell+tex=20930us
+FRAME: total=21636us render=21298us swap=338us
+PERF: glyph=158us cell+tex=20527us
+FRAME: total=21274us render=20935us swap=339us
+PERF: glyph=266us cell+tex=20373us
+FRAME: total=21147us render=20844us swap=303us
+PERF: glyph=122us cell+tex=20443us
+FRAME: total=21083us render=20775us swap=308us
+PERF: glyph=162us cell+tex=21285us
+FRAME: total=22090us render=21734us swap=356us
+PERF: glyph=127us cell+tex=20557us
+FRAME: total=21506us render=20953us swap=553us
+PERF: glyph=313us cell+tex=20351us
+FRAME: total=21418us render=20896us swap=522us
+PERF: glyph=127us cell+tex=21748us
+FRAME: total=22372us render=22074us swap=298us
+PERF: glyph=169us cell+tex=21468us
+FRAME: total=22230us render=21897us swap=333us
+PERF: glyph=116us cell+tex=20439us
+FRAME: total=21145us render=20826us swap=319us
+PERF: glyph=262us cell+tex=20522us
+FRAME: total=21365us render=21030us swap=335us
+PERF: glyph=113us cell+tex=20561us
+FRAME: total=21233us render=20909us swap=324us
+PERF: glyph=119us cell+tex=20562us
+FRAME: total=21303us render=20950us swap=353us

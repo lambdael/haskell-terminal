@@ -52,7 +52,8 @@
           buildInputs = [ pkgs.makeWrapper ];
           postBuild = ''
             wrapProgram $out/bin/hsterm-gpipe \
-              --prefix PATH : ${ghcForDyre}/bin
+              --prefix PATH : ${ghcForDyre}/bin \
+              --run 'rm -rf "''${XDG_CACHE_HOME:-$HOME/.cache}/haskell-terminal"'
           '';
         };
       in

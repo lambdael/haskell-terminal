@@ -16,6 +16,7 @@ import Data.Char (chr, ord)
 import Data.IORef
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, getCurrentTime, diffUTCTime)
 import System.IO
 import qualified System.Process (readProcess)
@@ -174,12 +175,15 @@ runGPipeTerminal cfg = do
                    ++ ['\x2600'..'\x26FF'] -- Miscellaneous Symbols
     cache <- newGlyphCache (defaultCacheConfig fontPath)
       { gccPixelSize = pixelSize
+      , gccAtlasWidth = 4096
+      , gccAtlasHeight = 4096
       , gccInitialChars = termCharSet
       , gccFallbackFonts = fallbackFonts
       }
     liftIO $ putStrLn $ "GlyphCache created, pre-loaded " ++ show (length termCharSet) ++ " chars"
 
-
+    -- キャッシュ済み文字を追跡（差分処理でensureGlyphsの負荷を軽減）
+    cachedCharsRef <- liftIO $ newIORef (Set.fromList termCharSet)
 
     -- PTY にバイト列を送る共通ヘルパー
     let sendPtyIO :: String -> IO ()
@@ -395,7 +399,7 @@ runGPipeTerminal cfg = do
                 writeIORef imeAfterEnterRef False
 
     startTime <- liftIO getCurrentTime
-    mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPtyIO (ptyPid pty) mousePosRef startTime cellW cellH
+    mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPtyIO (ptyPid pty) mousePosRef startTime cellW cellH cachedCharsRef
 
 -- | メインループ。
 --
@@ -429,8 +433,9 @@ mainLoop
   -> UTCTime -- ^ startTime
   -> Float   -- ^ cellW
   -> Float   -- ^ cellH
+  -> IORef (Set.Set Char) -- ^ cachedCharsRef
   -> ContextT GLFW.Handle os IO ()
-mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPty pid mousePosRef startTime cellW cellH = do
+mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef clipboardWriteRef pasteRequestRef processPostEvents sendPty pid mousePosRef startTime cellW cellH cachedCharsRef = do
   -- 初期 FontInfo を取得
   fi0 <- liftIO $ cacheFontInfo cache
   -- ウィンドウサイズを取得
@@ -593,9 +598,35 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
       when (isDirty || resized) $ do
         scrollOff <- liftIO $ readIORef scrollOffsetRef
         sel <- liftIO $ readIORef selectionRef
-        -- 画面上のすべての文字を収集し、動的キャッシュに追加
-        let visibleChars = [character (screen term ! idx) | idx <- indices (screen term)]
-        ensureGlyphs cache visibleChars
+
+        t0 <- liftIO getCurrentTime
+        -- 実際に表示される文字を収集（scrollOffset を考慮）
+        -- '\0' はワイド文字継続セルのマーカーなので除外する
+        let sbuf = scrollbackBuffer term
+            sbLen = Seq.length sbuf
+            lookupChar (y, x)
+              | scrollOff <= 0 = character (screen term ! (y, x))
+              | otherwise =
+                  let vIdx = sbLen - scrollOff + (y - 1)
+                  in if vIdx < 0 then ' '
+                     else if vIdx < sbLen
+                          then let line = Seq.index sbuf vIdx
+                               in if x >= 1 && x <= length line
+                                  then character (line !! (x - 1))
+                                  else ' '
+                          else let screenRow = vIdx - sbLen + 1
+                               in if screenRow >= 1 && screenRow <= rows term
+                                     && x >= 1 && x <= cols term
+                                  then character (screen term ! (screenRow, x))
+                                  else ' '
+            visibleSet = Set.fromList [ch | idx <- indices (screen term), let ch = lookupChar idx, ch /= '\0', ch /= ' ']
+        cachedChars <- liftIO $ readIORef cachedCharsRef
+        let newChars = Set.toList (visibleSet `Set.difference` cachedChars)
+        when (not (null newChars)) $ do
+          ensureGlyphs cache newChars
+          liftIO $ writeIORef cachedCharsRef (cachedChars `Set.union` visibleSet)
+        t1 <- liftIO getCurrentTime
+
         fi <- liftIO $ cacheFontInfo cache
         let selRange = fmap selectionRange sel
             colorFn = mkColorResolver scheme elapsed
@@ -607,6 +638,10 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
         writeTexture2D fgTex  0 0 texSize fgColors
         writeTexture2D uvTex  0 0 texSize glyphUVs
         writeTexture2D posTex 0 0 texSize glyphPositions
+        t2 <- liftIO getCurrentTime
+
+        liftIO $ hPutStrLn stderr $ "PERF: glyph=" ++ show (round (realToFrac (diffUTCTime t1 t0) * 1000000 :: Double) :: Int)
+          ++ "us cell+tex=" ++ show (round (realToFrac (diffUTCTime t2 t1) * 1000000 :: Double) :: Int) ++ "us"
 
 
         let cursorVerts = if scrollOff > 0
@@ -664,8 +699,15 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
              , teMouseBuf = (mouseBuf, 0)
              }
 
+      tRender <- liftIO getCurrentTime
 
       swapWindowBuffers win
+
+      tSwap <- liftIO getCurrentTime
+      let usRender = round (realToFrac (diffUTCTime tRender now) * 1000000 :: Double) :: Int
+          usSwap   = round (realToFrac (diffUTCTime tSwap tRender) * 1000000 :: Double) :: Int
+      when (usRender + usSwap > 20000) $
+        liftIO $ hPutStrLn stderr $ "FRAME: total=" ++ show (usRender + usSwap) ++ "us render=" ++ show usRender ++ "us swap=" ++ show usSwap ++ "us"
 
       -- swapWindowBuffers が pollEvents を呼ぶので、ここで全イベント処理済み
       -- 遅延 Enter 処理: IME 確定と衝突しない場合のみ CR を送信

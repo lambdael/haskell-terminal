@@ -8,6 +8,7 @@ module Terminal.Terminal (newTerminal, defaultTerm, applyAction, applyActionsBat
 import System.Process
 import Data.Array
 import Data.Char
+import Data.List (foldl')
 import Control.Monad
 import Control.Monad.State hiding (state)
 import Data.Maybe (isNothing)
@@ -514,10 +515,10 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             ANSIAction [n] 'L'  -> insertLines n term
 
             -- DEC Private Mode Set (DECSET) — 各パラメータを個別適用
-            DECAction ps 'h'   -> foldl applyDECSet term ps
+            DECAction ps 'h'   -> foldl' applyDECSet term ps
 
             -- DEC Private Mode Reset (DECRST) — 各パラメータを個別適用
-            DECAction ps 'l'   -> foldl applyDECReset term ps
+            DECAction ps 'l'   -> foldl' applyDECReset term ps
 
             -- マウストラッキングモード（simplify 経由で単一パラメータから変換済みの場合）
             SetMouseMode m     -> term { mouseMode = m }
@@ -531,7 +532,7 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
             SetTerminalTitle t  -> term { terminalTitle = t }
 
             -- Attribute mode / color handling
-            SetAttributeMode ms -> foldl applyAttributeMode term ms
+            SetAttributeMode ms -> foldl' applyAttributeMode term ms
             -- SetAttributeMode [] -> applyAttributeMode term $ ResetAllAttributes
 
             -- Keypad mode switches (no-op for rendering; affects key encoding)
@@ -611,7 +612,7 @@ applyActionsBatched term actions = go term actions []
 
     -- SGR (色・属性変更): 画面は触らない
     go term (SetAttributeMode ms : rest) pending =
-      go (foldl applyAttributeMode term ms) rest pending
+      go (foldl' applyAttributeMode term ms) rest pending
 
     -- カーソル移動: 画面は触らない（クランプのみ）、pendingWrap を解除
     go term (SetCursor row col : rest) pending =
@@ -651,10 +652,10 @@ applyActionsBatched term actions = go term actions []
       go (term { scrollingRegion = (1, rows term), pendingWrap = False }) rest pending
     go term (DECAction ps 'h' : rest) pending =
       let term' = flush term pending
-      in go (foldl applyDECSet term' ps) rest []
+      in go (foldl' applyDECSet term' ps) rest []
     go term (DECAction ps 'l' : rest) pending =
       let term' = flush term pending
-      in go (foldl applyDECReset term' ps) rest []
+      in go (foldl' applyDECReset term' ps) rest []
     go term (SetMouseMode m : rest) pending =
       go (term { mouseMode = m }) rest pending
     go term (SetMouseEncoding e : rest) pending =
