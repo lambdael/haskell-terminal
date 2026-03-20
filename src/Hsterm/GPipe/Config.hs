@@ -25,6 +25,7 @@ import Data.List (dropWhileEnd)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Vector as V
 import Linear (V4(..))
 
 import Graphics.GPipe.Context.GLFW (Key(..))
@@ -210,8 +211,8 @@ extractSelectedText term scrollOffset (ar, ac) (cr, cc) =
                in if vIdx < 0 then ' '
                   else if vIdx < sbLen
                        then let line = Seq.index sbuf vIdx
-                            in if x >= 1 && x <= length line
-                               then character (line !! (x - 1))
+                            in if x >= 1 && x <= V.length line
+                               then character (line V.! (x - 1))
                                else ' '
                        else let screenRow = vIdx - sbLen + 1
                             in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c

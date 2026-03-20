@@ -35,6 +35,11 @@ import Prelude hiding ((<*))
 import Data.Array (indices, (!), bounds)
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as VM
+import Control.Monad.ST (runST)
+import Data.STRef (newSTRef, readSTRef, modifySTRef')
 
 import Graphics.GPipe
 import Linear (V2(..), V4(..))
@@ -437,86 +442,106 @@ buildCellData
      , [V4 Float]   -- ^ fgColor per cell
      , [V4 Float]   -- ^ glyphUV (u0,v0,u1,v1) per cell
      , [V4 Float]   -- ^ glyphPos (ox,oy,w,h) per cell
+     , Set.Set Char  -- ^ visible characters (for glyph caching)
      )
-buildCellData fi term colorFn scrollOffset selection =
-  unzip4 $ map cellData (indices (screen term))
+buildCellData fi term colorFn scrollOffset selection = runST $ do
+  let asc = fromIntegral (fiAscender fi) :: Float
+      sbuf = scrollbackBuffer term
+      sbLen = Seq.length sbuf
+      r = rows term
+      c = cols term
+      n = r * c
+
+  bgV  <- VM.new n
+  fgV  <- VM.new n
+  uvV  <- VM.new n
+  posV <- VM.new n
+  charsRef <- newSTRef Set.empty
+
+  let lookupCell (y, x)
+        | scrollOffset <= 0 = screen term ! (y, x)
+        | otherwise =
+            let vIdx = sbLen - scrollOffset + (y - 1)
+            in if vIdx < 0
+               then emptyChar
+               else if vIdx < sbLen
+                    then let line = Seq.index sbuf vIdx
+                         in if x >= 1 && x <= V.length line
+                            then line V.! (x - 1)
+                            else emptyChar
+                    else let screenRow = vIdx - sbLen + 1
+                         in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c
+                            then screen term ! (screenRow, x)
+                            else emptyChar
+
+      emptyChar = TerminalChar ' ' (currentForeground term) (currentBackground term) False False False False
+
+      glyphInfo ' ' = (V4 0 0 0 0, V4 0 0 0 0)
+      glyphInfo ch  = case Map.lookup ch (fiGlyphs fi) of
+        Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
+        Just gr ->
+          let gm = grMetrics gr
+          in ( V4 (grU0 gr) (grV0 gr) (grU1 gr) (grV1 gr)
+             , V4 (fromIntegral (gmBearingX gm))
+                  (asc - fromIntegral (gmBearingY gm))
+                  (fromIntegral (gmWidth gm))
+                  (fromIntegral (gmHeight gm))
+             )
+
+  -- indices の順序（行メジャー (1,1)..(r,c)）でループ
+  let go !i [] = return ()
+      go !i ((y, x) : rest) = do
+        let tc  = lookupCell (y, x)
+            bgc = if isInverse tc then foregroundColor tc else backgroundColor tc
+            fgc = if isInverse tc then backgroundColor tc else foregroundColor tc
+            bgCol = colorFn False bgc
+            fgCol = colorFn (isBright tc) fgc
+            inSelection = case selection of
+              Nothing -> False
+              Just ((r1, c1), (r2, c2))
+                | r1 == r2  -> y == r1 && x >= c1 && x <= c2
+                | otherwise -> (y == r1 && x >= c1)
+                            || (y > r1 && y < r2)
+                            || (y == r2 && x <= c2)
+            (bgCol', fgCol') = if inSelection
+              then let V4 rv gv bv _ = fgCol in (V4 rv gv bv 2.0, bgCol)
+              else (bgCol, fgCol)
+            ch = character tc
+            (glyphUV, glyphPos)
+              | ch == '\0', x > 1 =
+                  let prevCh = character (lookupCell (y, x - 1))
+                  in case Map.lookup prevCh (fiGlyphs fi) of
+                    Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
+                    Just gr ->
+                      let gm = grMetrics gr
+                          cw' = cellWidth fi
+                      in ( V4 (grU0 gr) (grV0 gr) (grU1 gr) (grV1 gr)
+                         , V4 (fromIntegral (gmBearingX gm) - cw')
+                              (asc - fromIntegral (gmBearingY gm))
+                              (fromIntegral (gmWidth gm))
+                              (fromIntegral (gmHeight gm))
+                         )
+              | otherwise = glyphInfo ch
+        VM.write bgV  i bgCol'
+        VM.write fgV  i fgCol'
+        VM.write uvV  i glyphUV
+        VM.write posV i glyphPos
+        -- 可視文字を収集（スペースとワイド文字継続マーカーを除外）
+        when (ch /= ' ' && ch /= '\0') $
+          modifySTRef' charsRef (Set.insert ch)
+        go (i + 1) rest
+
+  go 0 (indices (screen term))
+
+  bgF  <- V.toList <$> V.unsafeFreeze bgV
+  fgF  <- V.toList <$> V.unsafeFreeze fgV
+  uvF  <- V.toList <$> V.unsafeFreeze uvV
+  posF <- V.toList <$> V.unsafeFreeze posV
+  chars <- readSTRef charsRef
+  return (bgF, fgF, uvF, posF, chars)
   where
-    asc = fromIntegral (fiAscender fi) :: Float
-    sbuf = scrollbackBuffer term
-    sbLen = Seq.length sbuf
-    r = rows term
-    c = cols term
-
-    -- | スクロールオフセットを考慮してセルの文字を取得する。
-    lookupCell (y, x)
-      | scrollOffset <= 0 = screen term ! (y, x)
-      | otherwise =
-          let vIdx = sbLen - scrollOffset + (y - 1)
-          in if vIdx < 0
-             then emptyChar
-             else if vIdx < sbLen
-                  then let line = Seq.index sbuf vIdx
-                       in if x >= 1 && x <= length line
-                          then line !! (x - 1)
-                          else emptyChar
-                  else let screenRow = vIdx - sbLen + 1
-                       in if screenRow >= 1 && screenRow <= r && x >= 1 && x <= c
-                          then screen term ! (screenRow, x)
-                          else emptyChar
-
-    emptyChar = TerminalChar ' ' (currentForeground term) (currentBackground term) False False False False
-
-    cellData (y, x) =
-      let tc  = lookupCell (y, x)
-          bgc = if isInverse tc then foregroundColor tc else backgroundColor tc
-          fgc = if isInverse tc then backgroundColor tc else foregroundColor tc
-          bgCol = colorFn False bgc
-          fgCol = colorFn (isBright tc) fgc
-          -- 選択範囲内なら前景色と背景色を反転する
-          inSelection = case selection of
-            Nothing -> False
-            Just ((r1, c1), (r2, c2))
-              | r1 == r2  -> y == r1 && x >= c1 && x <= c2
-              | otherwise -> (y == r1 && x >= c1)
-                          || (y > r1 && y < r2)
-                          || (y == r2 && x <= c2)
-          -- 選択セルの背景 alpha を 2.0 にマーク（scBgAlpha をスキップさせる）
-          (bgCol', fgCol') = if inSelection
-            then let V4 r g b _ = fgCol in (V4 r g b 2.0, bgCol)
-            else (bgCol, fgCol)
-          ch = character tc
-          (glyphUV, glyphPos)
-            | ch == '\0', x > 1 =
-                -- ワイド文字の継続セル: 前セルのグリフの右半分を描画
-                let prevCh = character (lookupCell (y, x - 1))
-                in case Map.lookup prevCh (fiGlyphs fi) of
-                  Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
-                  Just gr ->
-                    let gm = grMetrics gr
-                        cw' = cellWidth fi
-                    in ( V4 (grU0 gr) (grV0 gr) (grU1 gr) (grV1 gr)
-                       , V4 (fromIntegral (gmBearingX gm) - cw')
-                            (asc - fromIntegral (gmBearingY gm))
-                            (fromIntegral (gmWidth gm))
-                            (fromIntegral (gmHeight gm))
-                       )
-            | otherwise = glyphInfo ch
-      in (bgCol', fgCol', glyphUV, glyphPos)
-
-    glyphInfo ' ' = (V4 0 0 0 0, V4 0 0 0 0)
-    glyphInfo ch  = case Map.lookup ch (fiGlyphs fi) of
-      Nothing -> (V4 0 0 0 0, V4 0 0 0 0)
-      Just gr ->
-        let gm = grMetrics gr
-        in ( V4 (grU0 gr) (grV0 gr) (grU1 gr) (grV1 gr)
-           , V4 (fromIntegral (gmBearingX gm))
-                (asc - fromIntegral (gmBearingY gm))
-                (fromIntegral (gmWidth gm))
-                (fromIntegral (gmHeight gm))
-           )
-
-    unzip4 :: [(a,b,c,d)] -> ([a],[b],[c],[d])
-    unzip4 = foldr (\(a,b,c,d) ~(as,bs,cs,ds) -> (a:as,b:bs,c:cs,d:ds)) ([],[],[],[])
+    when True  m = m
+    when False _ = return ()
 
 -- | カーソル矩形の頂点。
 buildCursorVertices

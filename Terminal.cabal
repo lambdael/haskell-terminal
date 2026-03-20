@@ -53,7 +53,8 @@ library
     terminfo,
     text,
     time,
-    unix
+    unix,
+    vector
   default-language: GHC2021
   ghc-options:      -O
 

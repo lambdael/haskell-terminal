@@ -12,6 +12,7 @@ import Data.Char
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Sequence (Seq)
 import Data.Tuple (swap)
+import qualified Data.Vector as V
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import qualified System.Console.Terminfo as TI
@@ -101,8 +102,8 @@ type TerminalScreen = TerminalArray TerminalChar
 -- | 色情報用の整数配列（内部使用）。
 type TerminalColorArray = TerminalArray Int
 
--- | スクロールバック履歴の1行分。各列の 'TerminalChar' のリスト。
-type ScrollbackLine = [TerminalChar]
+-- | スクロールバック履歴の1行分。各列の 'TerminalChar' の Vector。
+type ScrollbackLine = V.Vector TerminalChar
 
 -- | 代替画面バッファに切り替わる前の通常画面の状態を保存する。
 data AltScreenState = AltScreenState
@@ -274,6 +275,11 @@ instance Binary TerminalColor
 instance Binary MouseMode
 instance Binary MouseEncoding
 instance Binary AltScreenState
+
+-- | Vector の Binary インスタンス。
+instance Binary a => Binary (V.Vector a) where
+  put v = put (V.length v) >> V.mapM_ put v
+  get = do n <- get; V.replicateM n get
 
 -- | Terminal の Binary インスタンス。
 -- terminfo フィールドはシリアライズ不可（opaque ハンドル）なので除外する。

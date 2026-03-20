@@ -7,12 +7,16 @@
 module Terminal.Terminal (newTerminal, defaultTerm, applyAction, applyActionsBatched, testTerm, scrollTerminalDown, scrollTerminalUp, setSize) where
 import System.Process
 import Data.Array
+import Data.Array.ST (STArray, thaw, freeze, readArray, writeArray)
+import Data.Array.Unsafe (unsafeFreeze)
 import Data.Char
 import Data.List (foldl')
 import Control.Monad
+import Control.Monad.ST (ST, runST)
 import Control.Monad.State hiding (state)
 import Data.Maybe (isNothing)
 import qualified Data.Sequence as Seq
+import qualified Data.Vector as V
 import System.IO
 import System.Posix.IO
 import System.Posix.Terminal hiding (TerminalState)
@@ -188,7 +192,7 @@ pushScrollbackLine :: Terminal -> Terminal
 pushScrollbackLine term =
   let s = screen term
       c = cols term
-      topLine = [s ! (1, x_) | x_ <- [1..c]]
+      topLine = V.generate c (\i -> s ! (1, i + 1))
       buf = scrollbackBuffer term Seq.|> topLine
       buf' = if Seq.length buf > scrollbackMax term
              then Seq.drop 1 buf
@@ -541,140 +545,449 @@ applyAction term'@Terminal { screen = s, cursorPos = pos_, inBuffer = inb  } act
 
             _                   -> trace ("\nTerminal.hs Unimplemented action: " ++ show act) term
 
--- | 'applyAction' のバッチ最適化版。
+-- | 'applyAction' のバッチ最適化版（STArray ベース）。
 --
--- 連続する通常文字入力の画面書き込みを蓄積し、一括で @Array (//)@ に反映する。
--- @(//)@ は呼び出しごとに配列全体をコピーするため、1 文字ずつ呼ぶと
--- @O(actions × cells)@ のコストがかかるが、まとめて適用すると
--- @O(actions + cells)@ で済む。
+-- イミュータブル配列の @(//)@ は呼び出しごとに配列全体をコピーするため、
+-- アクションごとに呼ぶと @O(actions × cells)@ のコストがかかる。
+-- この関数は画面バッファを @STArray@ に @thaw@ し、全アクションを
+-- @writeArray@/@readArray@ で直接処理してから @unsafeFreeze@ で戻す。
+-- これにより @O(actions + cells)@ で済む。
 --
--- SGR・カーソル移動など画面バッファに触れないアクションは蓄積中でも
--- フラッシュせずにインラインで処理するため、htop のような
--- "SetCursor → SGR → 文字列" パターンでバッチが途切れない。
---
--- Deferred wrap: 最終列に文字を書いたら pendingWrap = True とし、
--- 次の文字入力時に折り返す。カーソル移動コマンドでは pendingWrap を解除する。
+-- 外部シグネチャは純粋関数のまま維持する。
 applyActionsBatched :: Terminal -> [TerminalAction] -> Terminal
 applyActionsBatched term [] = term
-applyActionsBatched term actions = go term actions []
-  where
-    -- | pending wrap を解決する。保留中なら折り返してから返す。
-    resolvePending t
-      | pendingWrap t =
-          let (py, _) = cursorPos t
-              (_, srBot) = scrollingRegion t
-          in if py == srBot
-             then scrollTerminalDown $ t { cursorPos = (srBot, 1), pendingWrap = False }
-             else if py >= rows t
-               then t { cursorPos = (rows t, 1), pendingWrap = False }
-               else t { cursorPos = (py + 1, 1), pendingWrap = False }
-      | otherwise = t
+applyActionsBatched term actions = runST $ do
+  arr0 <- thaw (screen term)
+  (finalTerm, finalArr) <- goST arr0 term actions
+  finalScreen <- unsafeFreeze finalArr
+  return $ finalTerm { screen = finalScreen }
 
-    -- 入力終了: 蓄積した書き込みを反映
-    go term [] pending = flush term pending
+-- ── ST ヘルパー関数 ────────────────────────────────────────
 
-    -- 通常文字入力: 画面書き込みを蓄積しカーソルだけ進める
-    go term (CharInput c : rest) pending
-      | c >= ' '  -- C0 制御文字は batched path では処理しない
-      = let term0 = if pendingWrap term then flush term pending else term
-            term1 = resolvePending term0
-            (y, x) = cursorPos term1
-            pending' = if pendingWrap term then [] else pending
-            wide = isWideChar c
-            cc = cols term1
-            contCell = (mkEmptyChar term1) { character = wideCharContinuation }
-        in if x >= 1 && y >= 1 && y <= rows term1
-           then if wide
-                then -- ワイド文字: 2セル分を使用
-                  if x >= cc
-                  then -- 最終列: ワイド文字は収まらないのでpending wrap
-                    go (term1 { pendingWrap = True })
-                       rest
-                       (((y, x), mkChar c term1) : pending')
-                  else if x >= cc - 1
-                  then -- 残り1セル: pending wrap
-                    go (term1 { pendingWrap = True })
-                       rest
-                       (((y, x + 1), contCell) : ((y, x), mkChar c term1) : pending')
-                  else -- 通常: 2セル書いてカーソルを2つ進める
-                    go (term1 { cursorPos = (y, x + 2) })
-                       rest
-                       (((y, x + 1), contCell) : ((y, x), mkChar c term1) : pending')
-                else -- 半角文字: 従来の処理
-                  if x >= cc
-                  then go (term1 { pendingWrap = True })
-                          rest
-                          (((y, x), mkChar c term1) : pending')
-                  else go (term1 { cursorPos = (y, x + 1) })
-                          rest
-                          (((y, x), mkChar c term1) : pending')
-           else go (applyAction (flush term1 pending') (CharInput c)) rest []
+-- | スクロール領域内の行を上にシフト（内容が上に移動、下端が空く）。
+scrollDownST :: (Int, Int) -> Int -> STArray s ScreenIndex TerminalChar -> ST s ()
+scrollDownST (startrow, endrow) c arr =
+  forM_ [startrow .. endrow - 1] $ \y ->
+    forM_ [1..c] $ \x -> do
+      val <- readArray arr (y + 1, x)
+      writeArray arr (y, x) val
 
-    -- SGR (色・属性変更): 画面は触らない
-    go term (SetAttributeMode ms : rest) pending =
-      go (foldl' applyAttributeMode term ms) rest pending
+-- | スクロール領域内の行を下にシフト（内容が下に移動、上端が空く）。
+scrollUpST :: (Int, Int) -> Int -> STArray s ScreenIndex TerminalChar -> ST s ()
+scrollUpST (startrow, endrow) c arr =
+  forM_ (reverse [startrow + 1 .. endrow]) $ \y ->
+    forM_ [1..c] $ \x -> do
+      val <- readArray arr (y - 1, x)
+      writeArray arr (y, x) val
 
-    -- カーソル移動: 画面は触らない（クランプのみ）、pendingWrap を解除
-    go term (SetCursor row col : rest) pending =
-      let y' = min (rows term) (max 1 row)
-          x' = min (cols term) (max 1 col)
-      in go (term { cursorPos = (y', x'), pendingWrap = False }) rest pending
-    go term (CursorUp n : rest) pending =
-      let (y, x) = cursorPos term
-      in go (term { cursorPos = (max 1 (y - n), x), pendingWrap = False }) rest pending
-    go term (CursorDown n : rest) pending =
-      let (y, x) = cursorPos term
-      in go (term { cursorPos = (min (rows term) (y + n), x), pendingWrap = False }) rest pending
-    go term (CursorForward n : rest) pending =
-      let (y, x) = cursorPos term
-      in go (term { cursorPos = (y, min (cols term) (x + n)), pendingWrap = False }) rest pending
-    go term (CursorBackward n : rest) pending =
-      let (y, x) = cursorPos term
-      in go (term { cursorPos = (y, max 1 (x - n)), pendingWrap = False }) rest pending
-    go term (CursorAbsoluteColumn col : rest) pending =
-      let (y, _) = cursorPos term
-      in go (term { cursorPos = (y, min (cols term) (max 1 col)), pendingWrap = False }) rest pending
-    go term (CursorAbsoluteRow row : rest) pending =
-      let (_, x) = cursorPos term
-      in go (term { cursorPos = (min (rows term) (max 1 row), x), pendingWrap = False }) rest pending
+-- | 指定行を空白文字で埋める。
+clearRowsST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> [Int] -> ST s ()
+clearRowsST arr emptyC c rs =
+  forM_ rs $ \y ->
+    forM_ [1..c] $ \x ->
+      writeArray arr (y, x) emptyC
 
-    -- no-op 系: 画面は触らない
-    go term (Ignored : rest) pending = go term rest pending
-    go term (ShowCursor s : rest) pending =
-      go (term { optionShowCursor = s }) rest pending
-    go term (SetTerminalTitle t : rest) pending =
-      go (term { terminalTitle = t }) rest pending
-    go term (KeypadKeysApplicationsMode : rest) pending = go term rest pending
-    go term (KeypadKeysNumericMode : rest) pending = go term rest pending
-    go term (SetScrollingRegion s e : rest) pending =
-      go (term { scrollingRegion = (s, e), pendingWrap = False }) rest pending
-    go term (ANSIAction [] 'r' : rest) pending =
-      go (term { scrollingRegion = (1, rows term), pendingWrap = False }) rest pending
-    go term (DECAction ps 'h' : rest) pending =
-      let term' = flush term pending
-      in go (foldl' applyDECSet term' ps) rest []
-    go term (DECAction ps 'l' : rest) pending =
-      let term' = flush term pending
-      in go (foldl' applyDECReset term' ps) rest []
-    go term (SetMouseMode m : rest) pending =
-      go (term { mouseMode = m }) rest pending
-    go term (SetMouseEncoding e : rest) pending =
-      go (term { mouseEncoding = e }) rest pending
-    go term (SaveCursorPos : rest) pending =
-      go (term { savedCursor = Just (cursorPos term) }) rest pending
-    go term (RestoreCursorPos : rest) pending =
-      go (restoreSavedCursor term) rest pending
-    go term (ANSIAction [] 's' : rest) pending =
-      go (term { savedCursor = Just (cursorPos term) }) rest pending
-    go term (ANSIAction [] 'u' : rest) pending =
-      go (restoreSavedCursor term) rest pending
-    go term (ANSIAction _ 'm' : rest) pending = go term rest pending
+-- | 指定行の指定列を空白文字で埋める。
+clearColumnsST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> [Int] -> ST s ()
+clearColumnsST arr emptyC row cs =
+  forM_ cs $ \x ->
+    writeArray arr (row, x) emptyC
 
-    -- その他（スクロール、消去、文字削除/挿入 等）:
-    -- 蓄積した書き込みを反映してから applyAction で処理
-    go term (act : rest) pending =
-      go (applyAction (flush term pending) act) rest []
+-- | DCH: カーソル位置から n 文字を削除し残りを左シフト。
+deleteCharsST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> Int -> Int -> Int -> ST s ()
+deleteCharsST arr emptyC n row cx maxCol = do
+  -- 左にシフト
+  forM_ [cx .. maxCol - n] $ \col ->
+    when (col + n <= maxCol) $ do
+      val <- readArray arr (row, col + n)
+      writeArray arr (row, col) val
+  -- 右端を空白で埋める
+  forM_ [max cx (maxCol - n + 1) .. maxCol] $ \col ->
+    writeArray arr (row, col) emptyC
 
-    flush term [] = term
-    flush term@Terminal{screen = s} ws = term { screen = s // ws }
+-- | ICH: カーソル位置に n 個の空白を挿入し既存文字を右シフト。
+insertCharsST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> Int -> Int -> Int -> ST s ()
+insertCharsST arr emptyC n row cx maxCol = do
+  -- 右にシフト（逆順）
+  forM_ (reverse [cx .. maxCol - n]) $ \col ->
+    when (col + n <= maxCol) $ do
+      val <- readArray arr (row, col)
+      writeArray arr (row, col + n) val
+  -- カーソル位置に空白
+  forM_ [cx .. min (cx + n - 1) maxCol] $ \col ->
+    writeArray arr (row, col) emptyC
+
+-- | DL: カーソル行から n 行を削除し残りを上シフト。
+deleteLinesST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> Int -> Int -> Int -> ST s ()
+deleteLinesST arr emptyC n cy srBot maxCol = do
+  forM_ [cy .. srBot - n] $ \row ->
+    when (row + n <= srBot) $
+      forM_ [1..maxCol] $ \col -> do
+        val <- readArray arr (row + n, col)
+        writeArray arr (row, col) val
+  forM_ [max cy (srBot - n + 1) .. srBot] $ \row ->
+    forM_ [1..maxCol] $ \col ->
+      writeArray arr (row, col) emptyC
+
+-- | IL: カーソル行に n 行の空白を挿入し既存行を下シフト。
+insertLinesST :: STArray s ScreenIndex TerminalChar -> TerminalChar -> Int -> Int -> Int -> Int -> ST s ()
+insertLinesST arr emptyC n cy srBot maxCol = do
+  forM_ (reverse [cy .. srBot - n]) $ \row ->
+    when (row + n <= srBot) $
+      forM_ [1..maxCol] $ \col -> do
+        val <- readArray arr (row, col)
+        writeArray arr (row + n, col) val
+  forM_ [cy .. min (cy + n - 1) srBot] $ \row ->
+    forM_ [1..maxCol] $ \col ->
+      writeArray arr (row, col) emptyC
+
+-- | 先頭行を STArray から読み取ってスクロールバック用 Vector を作成する。
+pushScrollbackST :: STArray s ScreenIndex TerminalChar -> Int -> ST s (V.Vector TerminalChar)
+pushScrollbackST arr c = V.generateM c $ \i -> readArray arr (1, i + 1)
+
+-- ── goST: STArray ベースのアクション処理ループ ──────────────
+
+goST :: STArray s ScreenIndex TerminalChar -> Terminal -> [TerminalAction]
+     -> ST s (Terminal, STArray s ScreenIndex TerminalChar)
+goST arr term [] = return (term, arr)
+goST arr term (act : rest) = case act of
+  Ignored -> goST arr term rest
+
+  -- C0 制御文字で無視するもの
+  CharInput c | c < ' ', c /= '\a', c /= '\t', c /= '\n', c /= '\r', c /= '\b'
+              -> goST arr term rest
+
+  CharInput '\a' -> goST arr term rest
+
+  -- Tab
+  CharInput '\t' ->
+    let (y, x) = cursorPos term
+        x' = min (cols term) ((x `div` 8 + 1) * 8)
+    in goST arr (term { cursorPos = (y, x'), pendingWrap = False }) rest
+
+  -- Newline (LF)
+  CharInput '\n' -> do
+    let term0 = term { pendingWrap = False }
+        (y, _) = cursorPos term0
+        (startrow, srBot) = scrollingRegion term0
+        r = rows term0
+        c = cols term0
+        emptyC = mkEmptyChar term0
+    term1 <- if y == srBot
+             then do
+               term0' <- if startrow == 1 && isNothing (altScreen term0)
+                 then do
+                   topLine <- pushScrollbackST arr c
+                   let buf = scrollbackBuffer term0 Seq.|> topLine
+                       buf' = if Seq.length buf > scrollbackMax term0
+                              then Seq.drop 1 buf else buf
+                   return $ term0 { scrollbackBuffer = buf', cursorPos = (srBot, 1) }
+                 else return $ term0 { cursorPos = (srBot, 1) }
+               scrollDownST (scrollingRegion term0') c arr
+               clearRowsST arr emptyC c [srBot]
+               return term0'
+             else if y >= r
+               then return $ term0 { cursorPos = (r, 1) }
+               else return $ safeCursor $ term0 { cursorPos = (y + 1, 1) }
+    goST arr term1 rest
+
+  -- Carriage return
+  CharInput '\r' ->
+    let (y, _) = cursorPos term
+    in goST arr (term { cursorPos = (y, 1), pendingWrap = False }) rest
+
+  -- Backspace
+  CharInput '\b' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    writeArray arr (y, x) emptyC
+    goST arr (safeCursor $ term { cursorPos = (y, max 1 (x - 1)), pendingWrap = False }) rest
+
+  -- 通常文字入力
+  CharInput ch -> do
+    let c = cols term
+        r = rows term
+    -- pendingWrap を解決
+    term1 <- resolvePendingST arr term
+    let (y0, x0) = cursorPos term1
+        wide = isWideChar ch
+        charCell = mkChar ch term1
+    if y0 >= 1 && y0 <= r && x0 >= 1
+      then do
+        if wide
+          then do
+            let contCell = (mkEmptyChar term1) { character = wideCharContinuation }
+            if x0 >= c
+              then do
+                writeArray arr (y0, x0) charCell
+                goST arr (term1 { pendingWrap = True }) rest
+              else if x0 >= c - 1
+              then do
+                writeArray arr (y0, x0) charCell
+                when (x0 + 1 <= c) $ writeArray arr (y0, x0 + 1) contCell
+                goST arr (term1 { pendingWrap = True }) rest
+              else do
+                writeArray arr (y0, x0) charCell
+                writeArray arr (y0, x0 + 1) contCell
+                goST arr (term1 { cursorPos = (y0, x0 + 2) }) rest
+          else do
+            writeArray arr (y0, x0) charCell
+            if x0 >= c
+              then goST arr (term1 { pendingWrap = True }) rest
+              else goST arr (term1 { cursorPos = (y0, x0 + 1) }) rest
+      else goST arr term1 rest
+
+  -- SGR (色・属性変更): 画面に触れない
+  SetAttributeMode ms ->
+    goST arr (foldl' applyAttributeMode term ms) rest
+
+  -- カーソル移動: 画面に触れない
+  SetCursor row col ->
+    let y' = min (rows term) (max 1 row)
+        x' = min (cols term) (max 1 col)
+    in goST arr (term { cursorPos = (y', x'), pendingWrap = False }) rest
+
+  CursorUp n ->
+    let (y, x) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (y - n, x), pendingWrap = False }) rest
+
+  CursorDown n ->
+    let (y, x) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (y + n, x), pendingWrap = False }) rest
+
+  CursorForward n ->
+    let (y, x) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (y, x + n), pendingWrap = False }) rest
+
+  CursorBackward n ->
+    let (y, x) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (y, x - n), pendingWrap = False }) rest
+
+  CursorAbsoluteColumn col ->
+    let (y, _) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (y, col), pendingWrap = False }) rest
+
+  CursorAbsoluteRow row ->
+    let (_, x) = cursorPos term
+    in goST arr (safeCursor $ term { cursorPos = (row, x), pendingWrap = False }) rest
+
+  ShowCursor s -> goST arr (term { optionShowCursor = s }) rest
+  SaveCursorPos -> goST arr (term { savedCursor = Just (cursorPos term) }) rest
+  RestoreCursorPos -> goST arr (restoreSavedCursor term) rest
+  SetTerminalTitle t -> goST arr (term { terminalTitle = t }) rest
+  KeypadKeysApplicationsMode -> goST arr term rest
+  KeypadKeysNumericMode -> goST arr term rest
+  SetScrollingRegion s e -> goST arr (term { scrollingRegion = (s, e), pendingWrap = False }) rest
+  SetMouseMode m -> goST arr (term { mouseMode = m }) rest
+  SetMouseEncoding e -> goST arr (term { mouseEncoding = e }) rest
+
+  ANSIAction [] 'r' ->
+    goST arr (term { scrollingRegion = (1, rows term), pendingWrap = False }) rest
+  ANSIAction _ 'm' -> goST arr term rest
+  ANSIAction [] 's' -> goST arr (term { savedCursor = Just (cursorPos term) }) rest
+  ANSIAction [] 'u' -> goST arr (restoreSavedCursor term) rest
+
+  -- Scroll
+  ScrollUp n -> do
+    let c = cols term
+        r = scrollingRegion term
+        emptyC = mkEmptyChar term
+    forM_ [1..n] $ \_ -> do
+      scrollUpST r c arr
+      clearRowsST arr emptyC c [fst r]
+    goST arr term rest
+
+  ScrollDown n -> do
+    let c = cols term
+        r = scrollingRegion term
+        emptyC = mkEmptyChar term
+    forM_ [1..n] $ \_ -> do
+      scrollDownST r c arr
+      clearRowsST arr emptyC c [snd r]
+    goST arr term rest
+
+  -- Erase screen
+  ANSIAction [2] 'J' -> do
+    let emptyC = mkEmptyChar term
+    clearRowsST arr emptyC (cols term) [1..rows term]
+    goST arr (term { cursorPos = (1, 1), pendingWrap = False }) rest
+
+  ANSIAction [1] 'J' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearRowsST arr emptyC (cols term) [1..y-1]
+    clearColumnsST arr emptyC y [1..x]
+    goST arr term rest
+
+  ANSIAction _ 'J' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearRowsST arr emptyC (cols term) [y+1..rows term]
+    clearColumnsST arr emptyC y [x..cols term]
+    goST arr term rest
+
+  -- Erase line
+  ANSIAction [2] 'K' -> do
+    let (y, _) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearColumnsST arr emptyC y [1..cols term]
+    goST arr term rest
+
+  ANSIAction [1] 'K' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearColumnsST arr emptyC y [1..x]
+    goST arr term rest
+
+  ANSIAction _ 'K' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearColumnsST arr emptyC y [x..cols term]
+    goST arr term rest
+
+  -- ECH: erase characters
+  ANSIAction [] 'X' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearColumnsST arr emptyC y [x..x]
+    goST arr term rest
+
+  ANSIAction [n] 'X' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    clearColumnsST arr emptyC y [x..min (x+n-1) (cols term)]
+    goST arr term rest
+
+  -- DCH: delete characters
+  ANSIAction [] 'P' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    deleteCharsST arr emptyC 1 y x (cols term)
+    goST arr term rest
+
+  ANSIAction [n] 'P' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    deleteCharsST arr emptyC n y x (cols term)
+    goST arr term rest
+
+  -- ICH: insert characters
+  ANSIAction [] '@' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    insertCharsST arr emptyC 1 y x (cols term)
+    goST arr term rest
+
+  ANSIAction [n] '@' -> do
+    let (y, x) = cursorPos term
+        emptyC = mkEmptyChar term
+    insertCharsST arr emptyC n y x (cols term)
+    goST arr term rest
+
+  -- DL: delete lines
+  ANSIAction [] 'M' -> do
+    let (cy, _) = cursorPos term
+        (_, srBot) = scrollingRegion term
+        emptyC = mkEmptyChar term
+    deleteLinesST arr emptyC 1 cy srBot (cols term)
+    goST arr term rest
+
+  ANSIAction [n] 'M' -> do
+    let (cy, _) = cursorPos term
+        (_, srBot) = scrollingRegion term
+        emptyC = mkEmptyChar term
+    deleteLinesST arr emptyC n cy srBot (cols term)
+    goST arr term rest
+
+  -- IL: insert lines
+  ANSIAction [] 'L' -> do
+    let (cy, _) = cursorPos term
+        (_, srBot) = scrollingRegion term
+        emptyC = mkEmptyChar term
+    insertLinesST arr emptyC 1 cy srBot (cols term)
+    goST arr term rest
+
+  ANSIAction [n] 'L' -> do
+    let (cy, _) = cursorPos term
+        (_, srBot) = scrollingRegion term
+        emptyC = mkEmptyChar term
+    insertLinesST arr emptyC n cy srBot (cols term)
+    goST arr term rest
+
+  -- DEC Private Mode Set (DECSET)
+  DECAction ps 'h' -> do
+    let applyDEC t p = case p of
+          25   -> t { optionShowCursor = True }
+          1000 -> t { mouseMode = MouseNormal }
+          1002 -> t { mouseMode = MouseButton }
+          1003 -> t { mouseMode = MouseAll }
+          1006 -> t { mouseEncoding = MouseEncodingSGR }
+          1048 -> t { savedCursor = Just (cursorPos t) }
+          -- alt screen: barrier 必要
+          _ | p `elem` [47, 1047, 1049] -> applyDECSet t p
+          _    -> t
+    -- alt screen 切り替えがあった場合のみ barrier
+    if any (`elem` [47, 1047, 1049]) ps
+      then do
+        curScreen <- freeze arr
+        let term' = foldl' applyDECSet (term { screen = curScreen }) ps
+        arr' <- thaw (screen term')
+        goST arr' term' rest
+      else goST arr (foldl' applyDEC term ps) rest
+
+  -- DEC Private Mode Reset (DECRST)
+  DECAction ps 'l' -> do
+    let applyDEC t p = case p of
+          25   -> t { optionShowCursor = False }
+          1000 -> t { mouseMode = MouseNone }
+          1002 -> t { mouseMode = MouseNone }
+          1003 -> t { mouseMode = MouseNone }
+          1006 -> t { mouseEncoding = MouseEncodingX10 }
+          1048 -> restoreSavedCursor t
+          -- alt screen: barrier 必要
+          _ | p `elem` [47, 1047, 1049] -> applyDECReset t p
+          _    -> t
+    if any (`elem` [47, 1047, 1049]) ps
+      then do
+        curScreen <- freeze arr
+        let term' = foldl' applyDECReset (term { screen = curScreen }) ps
+        arr' <- thaw (screen term')
+        goST arr' term' rest
+      else goST arr (foldl' applyDEC term ps) rest
+
+  -- その他: barrier で pure 関数にフォールバック
+  _ -> do
+    trace ("goST barrier fallback: " ++ show act) $ return ()
+    curScreen <- freeze arr
+    let term' = applyAction (term { screen = curScreen }) act
+    arr' <- thaw (screen term')
+    goST arr' term' rest
+
+-- | pendingWrap を解決する ST 版。
+resolvePendingST :: STArray s ScreenIndex TerminalChar -> Terminal
+                 -> ST s Terminal
+resolvePendingST arr term
+  | pendingWrap term = do
+      let (py, _) = cursorPos term
+          (startrow, srBot) = scrollingRegion term
+          c = cols term
+          emptyC = mkEmptyChar term
+      if py == srBot
+        then do
+          -- scrollTerminalDown: scrollback + scroll
+          term' <- if startrow == 1 && isNothing (altScreen term)
+            then do
+              topLine <- pushScrollbackST arr c
+              let buf = scrollbackBuffer term Seq.|> topLine
+                  buf' = if Seq.length buf > scrollbackMax term
+                         then Seq.drop 1 buf else buf
+              return $ term { scrollbackBuffer = buf', cursorPos = (srBot, 1), pendingWrap = False }
+            else return $ term { cursorPos = (srBot, 1), pendingWrap = False }
+          scrollDownST (scrollingRegion term') c arr
+          clearRowsST arr emptyC c [srBot]
+          return term'
+        else if py >= rows term
+          then return $ term { cursorPos = (rows term, 1), pendingWrap = False }
+          else return $ term { cursorPos = (py + 1, 1), pendingWrap = False }
+  | otherwise = return term
 

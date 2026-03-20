@@ -11,12 +11,12 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (SomeException(..), try, catch)
 import Control.Monad (unless, when, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.Array ((!), indices)
 import Data.Char (chr, ord)
 import Data.IORef
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Vector as V
 import Data.Time.Clock (UTCTime, getCurrentTime, diffUTCTime)
 import System.IO
 import qualified System.Process (readProcess)
@@ -163,7 +163,9 @@ runGPipeTerminal cfg = do
   -- GPipe メインループ
   runContextT GLFW.defaultHandleConfig $ do
     let winConf = (GLFW.defaultWindowConfig "hsterm")
-          { GLFW.configWidth = winW, GLFW.configHeight = winH }
+          { GLFW.configWidth = winW, GLFW.configHeight = winH
+          , GLFW.configSwapInterval = Just 0  -- VSync OFF: 入力遅延を削減
+          }
     win <- newWindow (WindowFormatColor RGBA8) winConf
 
     -- 動的グリフキャッシュを作成
@@ -212,7 +214,7 @@ runGPipeTerminal cfg = do
     -- Ctrl が押されているかを追跡する（charCallback で制御文字を二重送信しないため）
     ctrlHeld <- liftIO $ newIORef False
     -- IME 確定と Enter キーの衝突を防ぐ（遅延方式）。
-    -- Enter キー押下を一定時間（100ms）保留し、その間に IME の charCallback が
+    -- Enter キー押下を一定時間（30ms）保留し、その間に IME の charCallback が
     -- 発火したら CR を抑制する。charCallback と keyCallback が異なる
     -- pollEvents サイクルに分かれる場合にも対応する。
     pendingEnterRef <- liftIO $ newIORef (Nothing :: Maybe UTCTime)
@@ -401,8 +403,8 @@ runGPipeTerminal cfg = do
             Just enterTime -> do
               now <- getCurrentTime
               let elapsed = diffUTCTime now enterTime
-              -- 100ms 待ってから判断（IME charCallback の到着を待つ）
-              when (elapsed >= 0.1) $ do
+              -- 30ms 待ってから判断（IME charCallback の到着を待つ）
+              when (elapsed >= 0.03) $ do
                 imeOccurred <- readIORef imeAfterEnterRef
                 -- IME 入力がなかった場合のみ CR を送信
                 unless imeOccurred $ sendPtyIO "\r"
@@ -526,8 +528,21 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
        bgGridRef txtGridRef curBufRef curLenRef prevDimRef
        bgTexRef fgTexRef uvTexRef posTexRef
        timeBuf mouseBuf wpBuf = do
-      -- フレームレート制限
-      liftIO $ threadDelay (tcFrameDelay cfg)
+      -- フレームレート制限 + 入力レイテンシ最小化
+      -- PTY から新データが来ていなければ、短い間隔でポーリングしながら待つ
+      isDirtyFromPty <- liftIO $ readIORef dirty
+      unless isDirtyFromPty $ do
+        let delayUs = tcFrameDelay cfg
+            step = 2000  -- 2ms ごとにチェック
+            waitLoop remaining
+              | remaining <= 0 = return ()
+              | otherwise = do
+                  liftIO $ threadDelay (min step remaining)
+                  -- イベントをポーリングしてコールバックを発火
+                  _ <- GLFW.mainstep win GLFW.Poll
+                  d <- liftIO $ readIORef dirty
+                  unless d $ waitLoop (remaining - step)
+        waitLoop delayUs
 
       -- 経過時間を計算
       now <- liftIO getCurrentTime
@@ -610,51 +625,43 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
         scrollOff <- liftIO $ readIORef scrollOffsetRef
         sel <- liftIO $ readIORef selectionRef
 
-        -- 実際に表示される文字を収集（scrollOffset を考慮）
-        -- '\0' はワイド文字継続セルのマーカーなので除外する
-        let sbuf = scrollbackBuffer term
-            sbLen = Seq.length sbuf
-            lookupChar (y, x)
-              | scrollOff <= 0 = character (screen term ! (y, x))
-              | otherwise =
-                  let vIdx = sbLen - scrollOff + (y - 1)
-                  in if vIdx < 0 then ' '
-                     else if vIdx < sbLen
-                          then let line = Seq.index sbuf vIdx
-                               in if x >= 1 && x <= length line
-                                  then character (line !! (x - 1))
-                                  else ' '
-                          else let screenRow = vIdx - sbLen + 1
-                               in if screenRow >= 1 && screenRow <= rows term
-                                     && x >= 1 && x <= cols term
-                                  then character (screen term ! (screenRow, x))
-                                  else ' '
-            visibleSet = Set.fromList [ch | idx <- indices (screen term), let ch = lookupChar idx, ch /= '\0', ch /= ' ']
-        cachedChars <- liftIO $ readIORef cachedCharsRef
-        let newChars = Set.toList (visibleSet `Set.difference` cachedChars)
-        when (not (null newChars)) $ do
-          ensureGlyphs cache newChars
-          liftIO $ writeIORef cachedCharsRef (cachedChars `Set.union` visibleSet)
-
-        fi <- liftIO $ cacheFontInfo cache
+        fi0 <- liftIO $ cacheFontInfo cache
         -- 絶対行座標を現在のスクロールオフセットで画面行座標に変換
         let selScreen = fmap (\s ->
               let ((ar, ac), (cr, cc)) = selectionRange s
               in  ((ar + scrollOff, ac), (cr + scrollOff, cc))
               ) sel
             colorFn = mkColorResolver scheme elapsed
-            (bgColors, fgColors, glyphUVs, glyphPositions) =
-              buildCellData fi term colorFn scrollOff selScreen
             texSize = V2 c r
 
-        writeTexture2D bgTex  0 0 texSize bgColors
-        writeTexture2D fgTex  0 0 texSize fgColors
-        writeTexture2D uvTex  0 0 texSize glyphUVs
-        writeTexture2D posTex 0 0 texSize glyphPositions
+        -- buildCellData で visibleSet を取得（全セル走査は1回だけ）
+        let (bgColors0, fgColors0, glyphUVs0, glyphPositions0, visibleSet) =
+              buildCellData fi0 term colorFn scrollOff selScreen
+
+        -- 差分チェック: 新しい文字がある場合のみグリフキャッシュ更新
+        cachedChars <- liftIO $ readIORef cachedCharsRef
+        let newChars = Set.toList (visibleSet `Set.difference` cachedChars)
+        if null newChars
+          then do
+            writeTexture2D bgTex  0 0 texSize bgColors0
+            writeTexture2D fgTex  0 0 texSize fgColors0
+            writeTexture2D uvTex  0 0 texSize glyphUVs0
+            writeTexture2D posTex 0 0 texSize glyphPositions0
+          else do
+            -- 新グリフをキャッシュに追加してから再構築（稀なケース）
+            ensureGlyphs cache newChars
+            liftIO $ writeIORef cachedCharsRef (cachedChars `Set.union` visibleSet)
+            fi <- liftIO $ cacheFontInfo cache
+            let (bgColors, fgColors, glyphUVs, glyphPositions, _) =
+                  buildCellData fi term colorFn scrollOff selScreen
+            writeTexture2D bgTex  0 0 texSize bgColors
+            writeTexture2D fgTex  0 0 texSize fgColors
+            writeTexture2D uvTex  0 0 texSize glyphUVs
+            writeTexture2D posTex 0 0 texSize glyphPositions
 
         let cursorVerts = if scrollOff > 0
                           then []
-                          else buildCursorVertices fi term (tcCursorColor cfg)
+                          else buildCursorVertices fi0 term (tcCursorColor cfg)
             curLen = length cursorVerts
         liftIO $ writeIORef curLenRef curLen
         when (curLen > 0) $ do
