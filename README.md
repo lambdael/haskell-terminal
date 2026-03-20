@@ -7,7 +7,7 @@ Haskell で書かれた VT100/ANSI ターミナルエミュレータ。ライブ
 本プロジェクトは以下の2つのコンポーネントから構成される。
 
 1. **Terminal ライブラリ** — VT100/ANSI エスケープシーケンスのパーサーとターミナル状態マシンの純粋関数的実装
-2. **hsterm** — OpenGL + FTGL ベースのターミナルエミュレータ GUI（`xterm` や `gnome-terminal` と同等のもの）
+2. **hsterm-gpipe** — GPipe (Haskell 組み込み GPU パイプライン) + GLFW ベースのターミナルエミュレータ GUI
 
 ## スクリーンショット
 
@@ -15,13 +15,30 @@ Haskell で書かれた VT100/ANSI ターミナルエミュレータ。ライブ
 |---------|------|-----|
 | ![cmatrix](doc/screenshot_cmatrix.png) | ![htop](doc/screenshot_htop.png) | ![tig](doc/screenshot_tig.png) |
 
+## 機能
+
+- VT100/ANSI エスケープシーケンスの包括的サポート
+- GPipe による型安全な GPU レンダリングパイプライン
+- Haskell で記述可能なカスタムシェーダー（壁紙、背景、テキスト、カーソル）
+- Dyre による xmonad スタイルの設定・ホットリロード（`~/.config/haskell-terminal/haskell-terminal.hs`）
+- CJK / ワイド文字サポート（fontconfig による自動フォールバック）
+- マウスによるテキスト選択とクリップボード操作（Ctrl+Shift+C / V）
+- マウストラッキング（X10 / SGR エンコーディング）
+- スクロールバック（デフォルト 10,000 行）
+- カスタマイズ可能なカラースキーム（GPU アニメーション対応）
+- カーソルスタイル選択（ブロック / アンダーライン / バー）
+- キーバインディングのカスタマイズ
+
 ## ビルド
 
-NixOS / Nix flake を使用：
+NixOS / Nix flake を使用（GPipe 関連のローカル依存を含む）：
 
 ```bash
-# ビルド
+# ビルド（Dyre ホットリロード対応版）
 nix build
+
+# ビルド（Dyre なし）
+nix build .#unwrapped
 
 # 開発シェル
 nix develop
@@ -29,15 +46,14 @@ nix develop
 # 実行
 nix run
 # または
-./result/bin/hsterm
+./result/bin/hsterm-gpipe
 ```
 
-/home/akk/haskell-terminal/haskell-terminal.code-workspace
 Cabal のみで（依存関係が揃っている場合）：
 
 ```bash
 cabal build
-cabal run hsterm
+cabal run hsterm-gpipe
 ```
 
 ## テスト
@@ -71,21 +87,17 @@ src/
 │       └── TIOCSWINSZ.hs
 ├── System/Posix/
 │   └── IOCtl.hs         -- ioctl FFI ラッパー (vendored)
-├── Hsterm/              -- GUI アプリケーション
-│   ├── Main.hs          -- エントリポイント
-│   ├── Hsterm.hs        -- メインロジック (PTY, OpenGL, GLUT)
-│   ├── Config.hs        -- 設定 (色, フォント, レンダラー)
-│   ├── State.hs         -- アプリケーション状態
-│   ├── Renderer.hs      -- レンダラーインターフェース
-│   ├── Theme.hs         -- カラーテーマ
-│   ├── LoadShaders.hs   -- GLSL シェーダーローダー
-│   ├── Device.hs        -- IODevice インスタンス
-│   └── Renderer/        -- レンダラー実装
-│       ├── DefaultRenderer.hs
-│       ├── Background.hs
-│       ├── CursorRenderer.hs
-│       ├── FlatColor.hs
-│       └── Utils.hs
+├── Hsterm/GPipe/        -- GUI アプリケーション
+│   ├── Main.hs          -- メインループ (GPipe ウィンドウ, レンダリング, 入力処理)
+│   ├── Config.hs        -- 設定型 (TerminalConfig, CursorStyle, KeyBindings)
+│   ├── Shader.hs        -- シェーダー DSL (ShaderConfig, ColorScheme, ColorSlot)
+│   ├── Renderer.hs      -- GPipe シェーダーコンパイル, セルデータテクスチャ生成
+│   ├── Terminal.hs      -- PTY 管理, シェル起動, UTF-8 デコード
+│   ├── Monad.hs         -- HstermM モナド (キーバインド/フック用)
+│   ├── Dyre.hs          -- Dyre ホットリロード, 状態シリアライズ
+│   └── EntryPoint.hs    -- デフォルトエントリポイント
+├── app/
+│   └── Main.hs          -- 実行ファイルエントリポイント
 └── Hstermplay/
     └── Main.hs          -- script(1) リプレイユーティリティ
 
@@ -93,7 +105,6 @@ tests/
 ├── parser/Main.hs       -- パーサー単体テスト + QuickCheck
 └── terminal/Main.hs     -- ターミナル状態テスト + QuickCheck
 
-themes/default/          -- GLSL シェーダー (背景, カーソル, etc.)
 data/
 ├── init.sh              -- ターミナル初期化スクリプト
 ├── colors.sh            -- ANSI カラーテスト表示
@@ -135,31 +146,117 @@ Terminal.Types.Terminal        -- DiffArray ベースのスクリーンバッフ
 | `newTerminal` | `(Int, Int) → Maybe TI.Terminal → Terminal` | 指定サイズの空ターミナルを作成 |
 | `setSize` | `(Int, Int) → Terminal → Terminal` | リサイズ（アクションバッファのリプレイにより実装） |
 
-**設計上の特徴：**
+### hsterm-gpipe GUI
 
-- スクリーンバッファは `DiffArray` で管理。差分のみの更新で効率的
-- スクロールは配列のインデックスリマップ（`ixmap`）で実装
-- `applyAction` は全アクションを `allBuffer` に蓄積し、リサイズ時にリプレイ可能
-
-### hsterm GUI
-
-OpenGL + GLUT + FTGL を使ったターミナルエミュレータの GUI 部分。
+GPipe + GLFW + gpipe-freetype を使ったターミナルエミュレータの GUI 部分。
 
 ```
 Shell プロセス (bash 等)
   ↑↓ PTY (疑似端末)
-hsterm
-  ├── IORef Terminal      -- 共有ターミナル状態
-  ├── GLUT displayCallback  -- フレーム描画
-  ├── GLUT keyboardMouseCallback  -- キー入力 → PTY 送信
-  └── GLUT reshapeCallback  -- ウィンドウリサイズ → TIOCSWINSZ
+hsterm-gpipe
+  ├── TVar Terminal          -- 共有ターミナル状態
+  ├── GPipe render loop      -- フレーム描画 (4層シェーダー)
+  │   ├── Wallpaper layer    -- オプション壁紙
+  │   ├── Background layer   -- セル背景色
+  │   ├── Text layer         -- グリフ描画 (gpipe-freetype)
+  │   └── Cursor layer       -- カーソル描画
+  ├── charCallback           -- Unicode 文字入力 → PTY 送信
+  ├── keyCallback            -- 制御キー / キーバインド
+  ├── mouseButtonCallback    -- テキスト選択 / マウストラッキング
+  └── scrollCallback         -- スクロールバック / マウスホイール
 ```
 
-- 子プロセスは `openPseudoTerminal` で PTY を確保して起動
-- PTY からの出力を別スレッドで読み取り、`parseANSI` → `applyAction` で `IORef Terminal` を更新
-- 各フレームで `IORef` を読み、FTGL でテキスト描画、シェーダーで背景/カーソルを描画
-- カラーテーマは `TerminalConfig` の `colorMap` / `colorMapBright` で関数レベルで差し替え可能
-- `Renderer` は `IO (Render, Terminate)` 型で、背景・カーソルの描画をプラグイン可能
+**レンダリングアーキテクチャ:**
+
+- 固定グリッド頂点バッファ（リサイズ時のみ再生成）
+- 4種のセルデータテクスチャ（bgColor, fgColor, glyphUV, glyphPos）を毎フレーム更新
+- シェーダーは全て Haskell で記述し、GPipe が GLSL にコンパイル
+- 動的グリフキャッシュ（新出文字のみを差分追加）
+
+## カスタマイズ
+
+### Dyre 設定ファイル
+
+`~/.config/haskell-terminal/haskell-terminal.hs` に Haskell コードで設定を記述する。ファイルを保存して `Ctrl+Shift+R` でホットリロード可能（PTY セッションを維持したまま設定を反映）。
+
+基本的な設定例：
+
+```haskell
+import Hsterm.GPipe.Config
+import Hsterm.GPipe.Dyre
+import Hsterm.GPipe.Main
+
+main :: IO ()
+main = hsterm runGPipeTerminal defaultConfig
+  { tcFontSize   = 20
+  , tcInitialCols = 120
+  , tcInitialRows = 36
+  , tcCursorStyle = CursorBar
+  }
+```
+
+### 設定項目
+
+| フィールド | 型 | デフォルト | 説明 |
+|------------|-----|-----------|------|
+| `tcFontFamily` | `String` | `""` (自動検出) | fontconfig パターン |
+| `tcFontSize` | `Int` | `24` | フォントサイズ（ピクセル） |
+| `tcColorScheme` | `ColorScheme` | `defaultColorScheme` | 16色カラースキーム |
+| `tcShaderConfig` | `ShaderConfig` | `defaultShaderConfig` | シェーダーカスタマイズ |
+| `tcDefaultFg` | `TerminalColor` | `White` | デフォルト前景色 |
+| `tcDefaultBg` | `TerminalColor` | `Black` | デフォルト背景色 |
+| `tcCursorColor` | `V4 Float` | `V4 1.0 0.2 0.9 0.8` | カーソル RGBA |
+| `tcCursorStyle` | `CursorStyle` | `CursorBlock` | カーソルスタイル |
+| `tcInitialCols` | `Int` | `80` | 初期カラム数 |
+| `tcInitialRows` | `Int` | `24` | 初期行数 |
+| `tcScrollback` | `Int` | `10000` | スクロールバック行数 |
+| `tcShell` | `Maybe FilePath` | `Nothing` | シェルパス（`Nothing` = `$SHELL`） |
+| `tcFrameDelay` | `Int` | `16000` | フレーム遅延（μs、60fps ≈ 16000） |
+| `tcKeyBindings` | `KeyBindings` | `defaultKeyBindings` | キーバインディング |
+
+### シェーダーカスタマイズ
+
+シェーダーは GPipe の組み込み DSL で記述する。4種類のシェーダーレイヤーがカスタマイズ可能：
+
+| レイヤー | 型 | 説明 |
+|----------|-----|------|
+| `scWallpaper` | `Maybe WallpaperShaderDef` | フルスクリーン壁紙（`Nothing` = 無効） |
+| `scBgShader` | `BgShaderDef` | セル背景の描画 |
+| `scTextShader` | `TextShaderDef` | テキストの描画 |
+| `scCursorShader` | `CursorShaderDef` | カーソルの描画 |
+
+シェーダー関数には `ShaderGlobals`（時間、解像度、マウス位置、グリッドサイズ、セルサイズ）が渡される。
+
+### カラースキーム
+
+`ColorSlot` でカラーごとに表現を選択できる：
+
+- `SolidColor (V4 Float)` — 静的な色
+- `AnimatedColor (Float -> V4 Float)` — CPU 側のフレームごとアニメーション
+- `ColorShader (ShaderGlobals -> V2 FFloat -> V2 FFloat -> V4 FFloat)` — GPU フラグメントシェーダー
+
+GPU アニメーション付きカーソルの例：
+
+```haskell
+blinkingCursor globals _cellUV baseColor =
+  let t     = sgTime globals
+      blink = (sin (t * 3.0) + 1.0) * 0.5
+      V4 r g b _ = baseColor
+  in  V4 r g b (blink * 0.8)
+```
+
+### デフォルトキーバインディング
+
+| キー | アクション |
+|------|-----------|
+| `Ctrl+Q` | 終了 |
+| `Ctrl+Shift+C` | 選択テキストをコピー |
+| `Ctrl+Shift+V` | クリップボードから貼り付け |
+| `Ctrl+Shift+R` | 設定ホットリロード |
+| `Shift+PageUp` | 1ページ上にスクロール |
+| `Shift+PageDown` | 1ページ下にスクロール |
+| `Shift+Home` | スクロールバック先頭へ |
+| `Shift+End` | スクロールバック末尾へ |
 
 ## ユーティリティ
 
@@ -176,15 +273,6 @@ cabal run hstermplay -- session.log
 ```
 
 各ANSIアクションとそれを発生させたバイト列を表示し、最後にターミナルの最終画面を出力する。
-
-## カスタマイズ
-
-[src/Hsterm/Main.hs](src/Hsterm/Main.hs) の `myConfig` を編集することで、以下をカスタマイズできる：
-
-- `colorMap` / `colorMapBright` — 8色それぞれの RGB 値
-- `fontPath` — TTF フォントのパス
-- `fontSize` — フォントサイズ（ピクセル）
-- `backgroundRenderer` / `cursorRenderer` — 描画パイプライン
 
 ## ライセンス
 

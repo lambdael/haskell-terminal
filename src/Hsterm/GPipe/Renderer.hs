@@ -227,10 +227,12 @@ compileBgShader win winSize shaderCfg colorScheme cellW cellH numCols numRows =
           in  baseColor
           ) frags
         -- scBgAlpha でアルファを調整（壁紙を透かせるため）
-        -- DEBUG: 全セルを緑色で強制描画
+        -- alpha > 1.0 は選択セルのマーカー: scBgAlpha をスキップして不透明に
         alphaAdjusted = fmap (\c ->
           let V4 cr cg cb ca = c
-          in V4 cr cg cb (scBgAlpha shaderCfg ca)
+          in ifThenElse' (ca >* 1.0)
+               (V4 cr cg cb 1.0)
+               (V4 cr cg cb (scBgAlpha shaderCfg ca))
           ) colored
 
     drawWindowColor
@@ -471,14 +473,17 @@ buildCellData fi term colorFn scrollOffset selection =
           bgCol = colorFn False bgc
           fgCol = colorFn (isBright tc) fgc
           -- 選択範囲内なら前景色と背景色を反転する
-          selected = case selection of
+          inSelection = case selection of
             Nothing -> False
             Just ((r1, c1), (r2, c2))
               | r1 == r2  -> y == r1 && x >= c1 && x <= c2
               | otherwise -> (y == r1 && x >= c1)
                           || (y > r1 && y < r2)
                           || (y == r2 && x <= c2)
-          (bgCol', fgCol') = if selected then (fgCol, bgCol) else (bgCol, fgCol)
+          -- 選択セルの背景 alpha を 2.0 にマーク（scBgAlpha をスキップさせる）
+          (bgCol', fgCol') = if inSelection
+            then let V4 r g b _ = fgCol in (V4 r g b 2.0, bgCol)
+            else (bgCol, fgCol)
           ch = character tc
           (glyphUV, glyphPos)
             | ch == '\0', x > 1 =

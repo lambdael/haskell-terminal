@@ -246,6 +246,14 @@ Ctrl+Shift+R （キーバインドで発火）
 
 
 
+[akk@carbon:/mnt/share/haskell-terminal]$ cat perf.log 
+warning: Git tree '/mnt/share/haskell-terminal' is dirty
+these 2 derivations will be built:
+  /nix/store/p5pfjijhncbgipl0rpw5zy3hzpbjp797-ghc-9.6.6-with-packages.drv
+  /nix/store/3jnl490nh1w7f4l5v349nafasymw1y77-hsterm-gpipe-wrapped.drv
+building '/nix/store/p5pfjijhncbgipl0rpw5zy3hzpbjp797-ghc-9.6.6-with-packages.drv'...
+building '/nix/store/3jnl490nh1w7f4l5v349nafasymw1y77-hsterm-gpipe-wrapped.drv'...
+Launching custom binary /home/akk/.cache/haskell-terminal/haskell-terminal-linux-x86_64
 
 ## 各種プロジェクト
 - gpipe-freetype: Gpipe フォントレンダリング

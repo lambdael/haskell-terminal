@@ -155,8 +155,9 @@ doCopy = do
     Just s -> do
       term <- getTerminal
       scrollOff <- getScrollOffset
+      -- 選択座標は絶対行座標なので画面行座標に変換
       let ((r1, c1), (r2, c2)) = selectionRange s
-          txt = extractSelectedText term scrollOff (r1, c1) (r2, c2)
+          txt = extractSelectedText term scrollOff (r1 + scrollOff, c1) (r2 + scrollOff, c2)
       if null txt then return () else requestCopy txt
     Nothing -> return ()
 
@@ -217,7 +218,9 @@ extractSelectedText term scrollOffset (ar, ac) (cr, cc) =
                                then character (screen term ! (screenRow, x))
                                else ' '
       trimEnd = dropWhileEnd (== ' ')
-  in if r1 == r2
+      -- ワイド文字の継続セル ('\0') を除外する
+      stripNulls = filter (/= '\0')
+  in stripNulls $ if r1 == r2
      then trimEnd [lookupChar (r1, cx) | cx <- [c1..c2]]
      else let firstLine = trimEnd [lookupChar (r1, cx) | cx <- [c1..c]]
               midLines  = [trimEnd [lookupChar (ry, cx) | cx <- [1..c]] | ry <- [r1+1..r2-1]]

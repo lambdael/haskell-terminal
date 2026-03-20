@@ -247,8 +247,14 @@ runGPipeTerminal cfg = do
           Just action -> runAction action
           Nothing -> do
             -- カスタムバインドがない場合のデフォルトターミナル入力処理
-            -- 通常キー入力時はスクロール位置をリセット
-            writeIORef scrollOffsetRef 0
+            -- 修飾キー単体ではスクロール位置をリセットしない
+            let isModifierOnly = key `elem`
+                  [ Key'LeftShift, Key'RightShift
+                  , Key'LeftControl, Key'RightControl
+                  , Key'LeftAlt, Key'RightAlt
+                  , Key'LeftSuper, Key'RightSuper
+                  ]
+            unless isModifierOnly $ writeIORef scrollOffsetRef 0
             case key of
               -- Ctrl+文字 → 制御コード (Ctrl-A=0x01 ... Ctrl-Z=0x1A)
               _ | ctrl, Just c <- keyToAlpha key ->
@@ -308,7 +314,9 @@ runGPipeTerminal cfg = do
           when isDragging $ do
             let col = max 1 (min (cols term) (floor (px / realToFrac cellW) + 1 :: Int))
                 row = max 1 (min (rows term) (floor (py / realToFrac cellH) + 1 :: Int))
-            modifyIORef' selectionRef $ fmap $ \s -> s { selCurrent = (row, col) }
+            scrollOff <- readIORef scrollOffsetRef
+            let absRow = row - scrollOff
+            modifyIORef' selectionRef $ fmap $ \s -> s { selCurrent = (absRow, col) }
             writeIORef dirty True
 
     -- マウスボタンコールバック
@@ -336,10 +344,13 @@ runGPipeTerminal cfg = do
             (px, py) <- readIORef mousePosRef
             let col = max 1 (min (cols term) (floor (px / realToFrac cellW) + 1 :: Int))
                 row = max 1 (min (rows term) (floor (py / realToFrac cellH) + 1 :: Int))
+            scrollOff <- readIORef scrollOffsetRef
+            -- 絶対行座標（screenRow - scrollOffset）で保存
+            let absRow = row - scrollOff
             writeIORef mouseBtnRef isPress
             if isPress
               then do
-                writeIORef selectionRef (Just (Selection (row, col) (row, col)))
+                writeIORef selectionRef (Just (Selection (absRow, col) (absRow, col)))
                 writeIORef dirty True
               else return ()
 
@@ -599,7 +610,6 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
         scrollOff <- liftIO $ readIORef scrollOffsetRef
         sel <- liftIO $ readIORef selectionRef
 
-        t0 <- liftIO getCurrentTime
         -- 実際に表示される文字を収集（scrollOffset を考慮）
         -- '\0' はワイド文字継続セルのマーカーなので除外する
         let sbuf = scrollbackBuffer term
@@ -625,24 +635,22 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
         when (not (null newChars)) $ do
           ensureGlyphs cache newChars
           liftIO $ writeIORef cachedCharsRef (cachedChars `Set.union` visibleSet)
-        t1 <- liftIO getCurrentTime
 
         fi <- liftIO $ cacheFontInfo cache
-        let selRange = fmap selectionRange sel
+        -- 絶対行座標を現在のスクロールオフセットで画面行座標に変換
+        let selScreen = fmap (\s ->
+              let ((ar, ac), (cr, cc)) = selectionRange s
+              in  ((ar + scrollOff, ac), (cr + scrollOff, cc))
+              ) sel
             colorFn = mkColorResolver scheme elapsed
             (bgColors, fgColors, glyphUVs, glyphPositions) =
-              buildCellData fi term colorFn scrollOff selRange
+              buildCellData fi term colorFn scrollOff selScreen
             texSize = V2 c r
 
         writeTexture2D bgTex  0 0 texSize bgColors
         writeTexture2D fgTex  0 0 texSize fgColors
         writeTexture2D uvTex  0 0 texSize glyphUVs
         writeTexture2D posTex 0 0 texSize glyphPositions
-        t2 <- liftIO getCurrentTime
-
-        liftIO $ hPutStrLn stderr $ "PERF: glyph=" ++ show (round (realToFrac (diffUTCTime t1 t0) * 1000000 :: Double) :: Int)
-          ++ "us cell+tex=" ++ show (round (realToFrac (diffUTCTime t2 t1) * 1000000 :: Double) :: Int) ++ "us"
-
 
         let cursorVerts = if scrollOff > 0
                           then []
@@ -699,15 +707,7 @@ mainLoop win cache cfg termRef dirty winSizeRef scrollOffsetRef selectionRef cli
              , teMouseBuf = (mouseBuf, 0)
              }
 
-      tRender <- liftIO getCurrentTime
-
       swapWindowBuffers win
-
-      tSwap <- liftIO getCurrentTime
-      let usRender = round (realToFrac (diffUTCTime tRender now) * 1000000 :: Double) :: Int
-          usSwap   = round (realToFrac (diffUTCTime tSwap tRender) * 1000000 :: Double) :: Int
-      when (usRender + usSwap > 20000) $
-        liftIO $ hPutStrLn stderr $ "FRAME: total=" ++ show (usRender + usSwap) ++ "us render=" ++ show usRender ++ "us swap=" ++ show usSwap ++ "us"
 
       -- swapWindowBuffers が pollEvents を呼ぶので、ここで全イベント処理済み
       -- 遅延 Enter 処理: IME 確定と衝突しない場合のみ CR を送信
