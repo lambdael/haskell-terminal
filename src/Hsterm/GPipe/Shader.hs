@@ -266,7 +266,7 @@ hasAnimatedSlots scheme = any isAnimated normals || any isAnimated brights
     brights = map (csBright scheme) basicColors
     isAnimated (SolidColor _)    = False
     isAnimated (AnimatedColor _) = True
-    isAnimated (ColorShader _)   = True
+    isAnimated (ColorShader _)   = False  -- GPU 側で処理するため CPU テクスチャ更新不要
 
 -- ── GPU ディスパッチ ────────────────────────────────────
 
