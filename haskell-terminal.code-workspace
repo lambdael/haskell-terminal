@@ -17,6 +17,18 @@
 		},
 		{
 			"path": "../../../home/akk/.config/haskell-terminal"
+		},
+		{
+			"path": "../harmonia"
+		},
+		{
+			"path": "../loom"
+		},
+		{
+			"path": "../weave"
+		},
+		{
+			"path": "../../../home/akk/.config/weave"
 		}
 	],
 	"settings": {
@@ -219,6 +231,9 @@
 			"textCodeBlock.background": "#082204",
 			"textPreformat.foreground": "#be9603"
 		},
-		"peacock.color": "#215732"
+		"peacock.color": "#215732",
+		"haskell.manageHLS": "PATH",
+		"haskell.serverExecutablePath": "/home/akk/.local/bin/hls-direnv-wrapper",
+		"direnv.restart.automatic": true
 	}
 }

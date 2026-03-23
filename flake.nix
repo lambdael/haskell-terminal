@@ -53,6 +53,11 @@
           postBuild = ''
             wrapProgram $out/bin/hsterm-gpipe \
               --prefix PATH : ${ghcForDyre}/bin \
+              --unset NIX_GHC \
+              --unset NIX_GHCPKG \
+              --unset NIX_GHC_LIBDIR \
+              --unset NIX_GHC_DOCDIR \
+              --unset GHC_PACKAGE_PATH \
               --run 'rm -rf "''${XDG_CACHE_HOME:-$HOME/.cache}/haskell-terminal"'
           '';
         };
@@ -79,6 +84,15 @@
             pkg-config
             freetype
             glfw
+          ];
+        };
+
+        # Dyre config files: GHC with Terminal installed + HLS
+        devShells.config = pkgs.mkShell {
+          buildInputs = [
+            ghcForDyre
+            haskellPackages.haskell-language-server
+            haskellPackages.cabal-install
           ];
         };
       }
