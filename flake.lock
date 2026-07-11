@@ -21,8 +21,8 @@
     "gpipe-core-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1773443682,
-        "narHash": "sha256-vJeQV0e2oRij7cX0H8PKKdvWmO3Y8/PKe2w8pHdrd2Y=",
+        "lastModified": 1773957930,
+        "narHash": "sha256-Y5mXWU7cCpHp3TL5/gTl57Wjm1U/9ZLPsJ/TdMKc8Tc=",
         "path": "/mnt/share/GPipe-Core",
         "type": "path"
       },
@@ -34,8 +34,8 @@
     "gpipe-freetype-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1773927476,
-        "narHash": "sha256-li/G9EeOtWXzF0FPDdSF5hdrZcJc5cyJ/+8KRmoQ4Zs=",
+        "lastModified": 1774271044,
+        "narHash": "sha256-yjGn2WzaXkZ+IoBQoydaICBqISUHJED26MPhBPcr5/s=",
         "path": "/mnt/share/gpipe-freetype",
         "type": "path"
       },
